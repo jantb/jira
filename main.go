@@ -30,9 +30,6 @@ func main() {
 		fmt.Printf("Result: %v\n", res)
 		panic(err)
 	}
-
-	list, _, _ := jiraClient.Issue.Search("filter=16228", &jira.SearchOptions{StartAt:0, MaxResults:100})
-
 	m, err := buildIndexMapping()
 	if err != nil {
 		panic(err)
@@ -42,12 +39,18 @@ func main() {
 		index, err = bleve.New("example.bleve", m)
 	}
 
-	for _, l := range list {
-		err = index.Index(l.ID, l)
-		if err != nil {
-			log.Panic(err)
+
+	for ; ;  {
+		list, _, _ := jiraClient.Issue.Search("", &jira.SearchOptions{StartAt:0, MaxResults:100})
+
+		for _, l := range list {
+			err = index.Index(l.ID, l)
+			if err != nil {
+				log.Panic(err)
+			}
 		}
 	}
+
 
 	query := bleve.NewMatchAllQuery()
 	search := bleve.NewSearchRequest(query)
@@ -77,15 +80,15 @@ func buildIndexMapping() (mapping.IndexMapping, error) {
 	dateFieldMapping := bleve.NewDateTimeFieldMapping()
 
 
-	mapping := bleve.NewDocumentMapping()
+	m := bleve.NewDocumentMapping()
 
-	mapping.AddFieldMappingsAt("fields.summary", textFieldMapping)
-	mapping.AddFieldMappingsAt("fields.updated", dateFieldMapping)
+	m.AddFieldMappingsAt("fields.summary", textFieldMapping)
+	m.AddFieldMappingsAt("fields.updated", dateFieldMapping)
 
-	mapping.AddFieldMappingsAt("fields.description", textFieldMapping)
+	m.AddFieldMappingsAt("fields.description", textFieldMapping)
 
 	indexMapping := bleve.NewIndexMapping()
-	indexMapping.AddDocumentMapping("issue", mapping)
+	indexMapping.AddDocumentMapping("issue", m)
 
 	indexMapping.TypeField = "type"
 	indexMapping.DefaultAnalyzer = "en"
@@ -119,6 +122,7 @@ func printIssue(issue *document.Document) {
 			updated = string(value.Value())
 		}
 		if value.Name() == "fields.summary" {
+			value.Analyze()
 			summary = string(value.Value())
 		}
 		if value.Name() == "fields.status.name" {

@@ -2,9 +2,10 @@ package main
 
 import (
 	"strings"
+	"math"
 )
 
-func toLower(words string) []strings {
+func toLower(words string) []string {
 	return strings.Fields(strings.ToLower(words))
 }
 
@@ -16,11 +17,14 @@ func removeNorwegianStopwords(words []string) []string {
 	riktig så samme sant si siden sist skulle slik slutt som start stille tid til tilbake tilstand under ut uten
 	var vår ved verdi vi vil ville vite være vært`)
 	var ret []string
-	for _, stopword := range stopwords {
-		for _, word := range words {
+	for _, word := range words {
+		found := false
+		for _, stopword := range stopwords {
 			if stopword == word {
-				continue
+				found = true
 			}
+		}
+		if !found {
 			ret = append(ret, word)
 		}
 	}
@@ -39,9 +43,20 @@ func wf(words []string) (map[string]int) {
 	}
 	return m
 }
+func normalize(m map[string]int) map[string]float64 {
+	var count int
+	for _, value := range m {
+		count += value
+	}
+	r := make(map[string]float64)
+	for key, value := range m {
+		r[key] = float64(value) / float64(count)
+	}
+	return r
+}
 
 func set(words []string) []string {
-	set := make([]string, len(words))
+	var set []string
 	for _, word := range words {
 		contains := false
 		for _, w := range set {
@@ -57,11 +72,34 @@ func set(words []string) []string {
 	return set
 }
 
-func tf(string string) (map[string]int) {
-	words := removeNorwegianStopwords(toLower(string))
-	return wf(words)
+func tf(string string) (map[string]float64) {
+	return normalize(wf(removeNorwegianStopwords(toLower(string))))
 }
-func idf(string string) (map[string]int) {
-	words := set(removeNorwegianStopwords(toLower(string)))
-	return wf(words)
+func idf(strings []string) (map[string]float64) {
+	d := float64(len(strings))
+	var words []string
+	for _, s := range strings {
+		words = append(words, set(removeNorwegianStopwords(toLower(s)))...)
+	}
+	idfMap := make(map[string]float64)
+	for word, value := range wf(words) {
+		idfMap[word] = math.Log10(d / float64(value))
+	}
+	return idfMap
+}
+
+func tfidf(documents []string) (map[string]map[string]float64) {
+	tfidfMap := make(map[string]map[string]float64)
+	idf := idf(documents)
+
+	for _, document := range documents {
+		m := make(map[string]float64)
+		tf := tf(document)
+		for word, docFreq := range idf {
+			m[word] = float64(tf[word]) * docFreq
+		}
+		tfidfMap[document] = m
+	}
+
+	return tfidfMap
 }
