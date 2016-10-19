@@ -10,12 +10,12 @@ import (
 	"fmt"
 )
 
-type datastore struct {
+type searchIndex struct {
 	db *bolt.DB
 }
 
-func Open() datastore {
-	datastore := datastore{}
+func Open() searchIndex {
+	datastore := searchIndex{}
 	datastore.db = getDb()
 	return datastore
 }
@@ -25,7 +25,7 @@ type similaritystruct struct {
 	Similarity float64
 }
 
-func (d *datastore) Index(key string, data interface{}) error {
+func (d *searchIndex) Index(key string, data interface{}) error {
 	datab, err := json.Marshal(data)
 	if err != nil {
 		fmt.Println(err)
@@ -40,7 +40,7 @@ func (d *datastore) Index(key string, data interface{}) error {
 
 	return err
 }
-func (d *datastore) SearchAllMatching(count int) ([][]byte,error) {
+func (d *searchIndex) SearchAllMatching(count int) ([][]byte,error) {
 	var res [][]byte
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("store"))
@@ -57,7 +57,7 @@ func (d *datastore) SearchAllMatching(count int) ([][]byte,error) {
 	return res, err
 }
 
-func (d *datastore) getSimularities(key string) ([]similaritystruct, error) {
+func (d *searchIndex) getSimularities(key string) ([]similaritystruct, error) {
 	similarities := make([]similaritystruct, 0)
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("similarDocuments"))
@@ -71,7 +71,7 @@ func (d *datastore) getSimularities(key string) ([]similaritystruct, error) {
 
 	return similarities, nil
 }
-func (d *datastore) calculateSimularities(key, data string) error {
+func (d *searchIndex) calculateSimularities(key, data string) error {
 	m := make(map[string]string)
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("store"))

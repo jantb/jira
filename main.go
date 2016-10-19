@@ -5,54 +5,62 @@ import (
 	"fmt"
 	"log"
 	"encoding/json"
+	"time"
+	"flag"
+	"os"
 )
 
-var username = ""
-var password = ""
-var me = username
 
-var jiraServer = ""
-var index datastore
+var index searchIndex
+var conf config
+var indexIssues = flag.Bool("index", false, "Index jira, and generate similarities, uses a timestamp to only update new issues")
+
 func main() {
-
-	jiraClient, err := jira.NewClient(nil, jiraServer)
+	flag.Parse()
+	conf.load()
+	jiraClient, err := jira.NewClient(nil, conf.JiraServer)
 	if err != nil {
 		panic(err)
 	}
 
-	res, err := jiraClient.Authentication.AcquireSessionCookie(username, password)
-	if err != nil || res == false {
-		fmt.Printf("Result: %v\n", res)
+	_, err = jiraClient.Authentication.AcquireSessionCookie(conf.Username, conf.Password)
+	if err != nil {
+		bytes, _ := json.MarshalIndent(conf, "", "    ")
+		fmt.Printf("Invalid config:\n%s\n", string(bytes))
 		panic(err)
 	}
-
 	index = Open()
+	if *indexIssues {
+		now := time.Now()
+		for i := 0; ; i += 100 {
+			list, _, _ := jiraClient.Issue.Search("project=" + conf.Project, &jira.SearchOptions{StartAt:i, MaxResults:i + 100})
+			if len(list) == 0 {
+				resSearch, err := index.SearchAllMatching(1000000)
+				if err != nil {
+					log.Panic(err)
+				}
+				for i, value := range resSearch {
+					fmt.Println(i)
+					var issue jira.Issue
+					json.Unmarshal(value, &issue)
+					index.calculateSimularities(issue.Key, string(value))
+				}
 
-	for i := 0; ;i+=100  {
-		list, _, _ := jiraClient.Issue.Search("", &jira.SearchOptions{StartAt:i, MaxResults:i+100})
-		if len(list) == 0 {
-			resSearch, err := index.SearchAllMatching(1000000)
-			if err != nil {
-				log.Panic(err)
+				conf.LastUpdate = now
+				conf.store()
+				os.Exit(0)
 			}
-			for i, value := range resSearch {
-				fmt.Println(i)
-				var issue jira.Issue
-				json.Unmarshal(value, &issue)
-				index.calculateSimularities(issue.Key,string(value))
+			for _, l := range list {
+				err = index.Index(l.Key, l)
+				if err != nil {
+					log.Panic(err)
+				}
 			}
-			break
+			fmt.Println(i)
 		}
-		for _, l := range list {
-			err = index.Index(l.Key, l)
-			if err != nil {
-				log.Panic(err)
-			}
-		}
-		fmt.Println(i)
 	}
 
-	resSearch, err := index.SearchAllMatching(100)
+	resSearch, err := index.SearchAllMatching(1000)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -66,9 +74,9 @@ func main() {
 }
 
 func printSimularities(issue jira.Issue) {
-	b, _:=json.Marshal(issue)
-	index.calculateSimularities(issue.Key,string(b))
-	sim,_ := index.getSimularities(issue.Key)
+	b, _ := json.Marshal(issue)
+	index.calculateSimularities(issue.Key, string(b))
+	sim, _ := index.getSimularities(issue.Key)
 	for _, value := range sim[:10] {
 		fmt.Print(value.Key + " ")
 	}
@@ -79,7 +87,7 @@ func printIssue(issue jira.Issue) {
 	var creator = issue.Fields.Creator.Name
 	var assignee = ""
 	if issue.Fields.Assignee != nil {
-	assignee = issue.Fields.Assignee.Name
+		assignee = issue.Fields.Assignee.Name
 	}
 	var key = issue.Key
 	var updated = issue.Fields.Updated
@@ -88,7 +96,7 @@ func printIssue(issue jira.Issue) {
 	var fix = ""
 
 	for _, value := range issue.Fields.FixVersions {
-		if len(fix)!=0 {
+		if len(fix) != 0 {
 			fix += " "
 		}
 		fix += value.Name
@@ -103,11 +111,11 @@ func printIssue(issue jira.Issue) {
 	} else {
 		priority = fmt.Sprintf("%s", priorityValue)
 	}
-	if assignee == me {
-		assignee = fmt.Sprintf("\033[1;31m%-10s\033[m", me)
+	if assignee == conf.Username {
+		assignee = fmt.Sprintf("\033[1;31m%-10s\033[m", conf.Username)
 	}
-	if creator == me {
-		assignee = fmt.Sprintf("\033[1;31m-10%s\033[m", me)
+	if creator == conf.Username {
+		assignee = fmt.Sprintf("\033[1;31m-10%s\033[m", conf.Username)
 	}
 	fmt.Printf("%-15s %-15s %-10s %-10s %-10s %-20s %-20s %s\n",
 		key, updated[:len("2006-01-02T15:04:05")], priority, assignee, creator, fix, status, summary)
