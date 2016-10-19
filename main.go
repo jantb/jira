@@ -12,7 +12,7 @@ var password = ""
 var me = username
 
 var jiraServer = ""
-
+var index datastore
 func main() {
 
 	jiraClient, err := jira.NewClient(nil, jiraServer)
@@ -26,16 +26,32 @@ func main() {
 		panic(err)
 	}
 
-	index := Open()
+	index = Open()
 
-	list, _, _ := jiraClient.Issue.Search("", &jira.SearchOptions{StartAt:0, MaxResults:100})
-
-	for _, l := range list {
-		err = index.Index(l.Key, l)
-		if err != nil {
-			log.Panic(err)
+	for i := 0; ;i+=100  {
+		list, _, _ := jiraClient.Issue.Search("", &jira.SearchOptions{StartAt:i, MaxResults:i+100})
+		if len(list) == 0 {
+			resSearch, err := index.SearchAllMatching(1000000)
+			if err != nil {
+				log.Panic(err)
+			}
+			for i, value := range resSearch {
+				fmt.Println(i)
+				var issue jira.Issue
+				json.Unmarshal(value, &issue)
+				index.calculateSimularities(issue.Key,string(value))
+			}
+			break
 		}
+		for _, l := range list {
+			err = index.Index(l.Key, l)
+			if err != nil {
+				log.Panic(err)
+			}
+		}
+		fmt.Println(i)
 	}
+
 	resSearch, err := index.SearchAllMatching(100)
 	if err != nil {
 		log.Panic(err)
@@ -44,10 +60,20 @@ func main() {
 		var issue jira.Issue
 		json.Unmarshal(value, &issue)
 		printIssue(issue)
+		printSimularities(issue)
 	}
 
 }
 
+func printSimularities(issue jira.Issue) {
+	b, _:=json.Marshal(issue)
+	index.calculateSimularities(issue.Key,string(b))
+	sim,_ := index.getSimularities(issue.Key)
+	for _, value := range sim[:10] {
+		fmt.Print(value.Key + " ")
+	}
+	fmt.Print("\n")
+}
 func printIssue(issue jira.Issue) {
 	var priorityValue = issue.Fields.Priority.Name
 	var creator = issue.Fields.Creator.Name
