@@ -103,3 +103,23 @@ func tfidf(documents []string) (map[string]map[string]float64) {
 
 	return tfidfMap
 }
+func tfidfMap(documents map[string]string) (map[string]map[string]float64) {
+	tfidfMap := make(map[string]map[string]float64)
+	var d []string
+	for _, document := range documents {
+		d = append(d, document)
+	}
+
+	idf := idf(d)
+
+	for key, document := range documents {
+		m := make(map[string]float64)
+		tf := tf(document)
+		for word, docFreq := range idf {
+			m[word] = float64(tf[word]) * docFreq
+		}
+		tfidfMap[key] = m
+	}
+
+	return tfidfMap
+}

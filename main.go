@@ -3,24 +3,19 @@ package main
 import (
 	"github.com/andygrunwald/go-jira"
 	"fmt"
-	"github.com/blevesearch/bleve"
 	"log"
-	"github.com/blevesearch/bleve/mapping"
-	"github.com/blevesearch/bleve/analysis/lang/en"
-	"github.com/blevesearch/bleve/analysis/analyzer/keyword"
-	"github.com/blevesearch/bleve/document"
+	"encoding/json"
 )
 
 var username = ""
 var password = ""
 var me = username
 
-// Jira server without http://
 var jiraServer = ""
 
 func main() {
 
-	jiraClient, err := jira.NewClient(nil, "http://" + jiraServer)
+	jiraClient, err := jira.NewClient(nil, jiraServer)
 	if err != nil {
 		panic(err)
 	}
@@ -30,107 +25,47 @@ func main() {
 		fmt.Printf("Result: %v\n", res)
 		panic(err)
 	}
-	m, err := buildIndexMapping()
-	if err != nil {
-		panic(err)
-	}
-	index, err := bleve.Open("example.bleve")
-	if err != nil {
-		index, err = bleve.New("example.bleve", m)
-	}
 
+	index := Open()
 
-	for ; ;  {
-		list, _, _ := jiraClient.Issue.Search("", &jira.SearchOptions{StartAt:0, MaxResults:100})
+	list, _, _ := jiraClient.Issue.Search("", &jira.SearchOptions{StartAt:0, MaxResults:100})
 
-		for _, l := range list {
-			err = index.Index(l.ID, l)
-			if err != nil {
-				log.Panic(err)
-			}
+	for _, l := range list {
+		err = index.Index(l.Key, l)
+		if err != nil {
+			log.Panic(err)
 		}
 	}
-
-
-	query := bleve.NewMatchAllQuery()
-	search := bleve.NewSearchRequest(query)
-	search.Size = 100
-	search.SortBy([]string{"-_id"})
-	searchResults, err := index.Search(search)
+	resSearch, err := index.SearchAllMatching(100)
 	if err != nil {
 		log.Panic(err)
 	}
-	for _, h := range searchResults.Hits {
-		b, _ := index.Document(h.ID)
-		printIssue(b)
+	for _, value := range resSearch {
+		var issue jira.Issue
+		json.Unmarshal(value, &issue)
+		printIssue(issue)
 	}
+
 }
 
-func buildIndexMapping() (mapping.IndexMapping, error) {
-
-	// a generic reusable mapping for english text
-	textFieldMapping := bleve.NewTextFieldMapping()
-	textFieldMapping.Analyzer = en.AnalyzerName
-
-	// a generic reusable mapping for keyword text
-	keywordFieldMapping := bleve.NewTextFieldMapping()
-	keywordFieldMapping.Analyzer = keyword.Name
-
-	// a generic reusable mapping for keyword text
-	dateFieldMapping := bleve.NewDateTimeFieldMapping()
-
-
-	m := bleve.NewDocumentMapping()
-
-	m.AddFieldMappingsAt("fields.summary", textFieldMapping)
-	m.AddFieldMappingsAt("fields.updated", dateFieldMapping)
-
-	m.AddFieldMappingsAt("fields.description", textFieldMapping)
-
-	indexMapping := bleve.NewIndexMapping()
-	indexMapping.AddDocumentMapping("issue", m)
-
-	indexMapping.TypeField = "type"
-	indexMapping.DefaultAnalyzer = "en"
-
-	return indexMapping, nil
-}
-
-func printIssue(issue *document.Document) {
-	var priorityValue = ""
-	var creator = ""
+func printIssue(issue jira.Issue) {
+	var priorityValue = issue.Fields.Priority.Name
+	var creator = issue.Fields.Creator.Name
 	var assignee = ""
-	var key = ""
-	var updated = ""
-	var summary = ""
-	var status = "status"
+	if issue.Fields.Assignee != nil {
+	assignee = issue.Fields.Assignee.Name
+	}
+	var key = issue.Key
+	var updated = issue.Fields.Updated
+	var summary = issue.Fields.Summary
+	var status = issue.Fields.Status.Name
 	var fix = ""
-	for _, value := range issue.Fields {
-		if value.Name() == "fields.priority.name" {
-			priorityValue = string(value.Value())
+
+	for _, value := range issue.Fields.FixVersions {
+		if len(fix)!=0 {
+			fix += " "
 		}
-		if value.Name() == "fields.Creator.name" {
-			creator = string(value.Value())
-		}
-		if value.Name() == "fields.assignee.name" {
-			assignee = string(value.Value())
-		}
-		if value.Name() == "key" {
-			key = string(value.Value())
-		}
-		if value.Name() == "fields.updated" {
-			updated = string(value.Value())
-		}
-		if value.Name() == "fields.summary" {
-			value.Analyze()
-			summary = string(value.Value())
-		}
-		if value.Name() == "fields.status.name" {
-			status = string(value.Value())
-		}
-		if value.Name() == "fields.fixVersions.name" {
-			fix = string(value.Value())
-		}
+		fix += value.Name
 	}
 	var priority = ""
 	if priorityValue == "Minor" {
