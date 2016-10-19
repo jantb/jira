@@ -31,6 +31,19 @@ func main() {
 	}
 	index = Open()
 	if *indexIssues {
+		resSearch, err := index.SearchAllMatching(1000000)
+		if err != nil {
+			log.Panic(err)
+		}
+		for i, value := range resSearch {
+			fmt.Println(i)
+			var issue jira.Issue
+			json.Unmarshal(value, &issue)
+			index.calculateSimularities(issue.Key, string(value))
+		}
+
+		os.Exit(0)
+
 		now := time.Now()
 		for i := 0; ; i += 100 {
 			list, _, _ := jiraClient.Issue.Search("project=" + conf.Project, &jira.SearchOptions{StartAt:i, MaxResults:i + 100})

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"github.com/bradfitz/slice"
 	"fmt"
+	"time"
 )
 
 type searchIndex struct {
@@ -40,12 +41,12 @@ func (d *searchIndex) Index(key string, data interface{}) error {
 
 	return err
 }
-func (d *searchIndex) SearchAllMatching(count int) ([][]byte,error) {
+func (d *searchIndex) SearchAllMatching(count int) ([][]byte, error) {
 	var res [][]byte
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("store"))
 		b.ForEach(func(k, v []byte) error {
-			res = append(res,v)
+			res = append(res, v)
 			count--
 			if count == 0 {
 				return nil
@@ -71,27 +72,39 @@ func (d *searchIndex) getSimularities(key string) ([]similaritystruct, error) {
 
 	return similarities, nil
 }
+
+var tfidfcache map[string]map[string]float64
+
 func (d *searchIndex) calculateSimularities(key, data string) error {
-	m := make(map[string]string)
-	err := d.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte("store"))
-		b.ForEach(func(k, v []byte) error {
-			m[string(k)] = string(v)
+	if tfidfcache == nil {
+		t := time.Now()
+		m := make(map[string]string)
+		err := d.db.View(func(tx *bolt.Tx) error {
+			b := tx.Bucket([]byte("store"))
+			b.ForEach(func(k, v []byte) error {
+				m[string(k)] = string(v)
+				return nil
+			})
 			return nil
 		})
-		return nil
-	})
-	if err != nil {
-		return err
+		if err != nil {
+			return err
+		}
+
+		m[key] = data
+		fmt.Println("generating tf-idf map...")
+		tfidfcache = tfidfMap(m)
+		fmt.Println()
+		fmt.Println(time.Now().Sub(t))
 	}
 
-	m[key] = data
+	tfidfdata := tfidfcache[key]
 
-	tfidf := tfidfMap(m)
-	tfidfdata := tfidf[key]
-
+	fmt.Println("generating similarity against all other documents")
+	t := time.Now()
 	var similarities []similaritystruct
-	for k, value := range tfidf {
+	var count int
+	for k, value := range tfidfcache {
 		if k == key {
 			continue
 		}
@@ -99,8 +112,11 @@ func (d *searchIndex) calculateSimularities(key, data string) error {
 			Key:k,
 			Similarity:similarity(tfidfdata, value),
 		})
+		count++
+		fmt.Printf("\r%d of %d",count , len(tfidfcache) )
 	}
-
+	fmt.Println()
+	fmt.Println(time.Now().Sub(t))
 	slice.Sort(similarities, func(i, j int) bool {
 		return similarities[i].Similarity < similarities[j].Similarity
 	})
