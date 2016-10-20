@@ -33,8 +33,13 @@ func main() {
 		now := time.Now()
 		for i := 0; ; i += 100 {
 			searchString := "project=" + conf.Project + " AND updated > '" + conf.LastUpdate.Format("2006/01/02 15:04" + "'")
-			list, _, _ := jiraClient.Issue.Search(searchString, &jira.SearchOptions{StartAt:i, MaxResults:i + 100})
+			list, _, err := jiraClient.Issue.Search(searchString, &jira.SearchOptions{StartAt:i, MaxResults:100})
+			if err != nil {
+				i -= 100
+				continue
+			}
 			if len(list) == 0 {
+				fmt.Println()
 				resSearch, err := index.SearchAllMatching(1000000)
 				if err != nil {
 					log.Panic(err)
