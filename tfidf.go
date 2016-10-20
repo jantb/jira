@@ -3,7 +3,6 @@ package main
 import (
 	"strings"
 	"math"
-	"fmt"
 )
 
 func toLower(words string) []string {
@@ -116,13 +115,11 @@ func tfidfMap(documents map[string]string) (map[string]map[string]float64) {
 	for key, document := range documents {
 		m := make(map[string]float64)
 		tf := tf(document)
-		for word, docFreq := range idf {
-			m[word] = float64(tf[word]) * docFreq
+		for word, docFreq := range tf {
+			m[word] = float64(idf[word]) * docFreq
 		}
 		tfidfMap[key] = m
 		count++
-		fmt.Printf("\r%d of %d",count , len(documents) )
 	}
-
 	return tfidfMap
 }

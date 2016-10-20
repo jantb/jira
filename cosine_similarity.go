@@ -7,9 +7,11 @@ import (
 func similarityVector(a, b []float64, dot float64) float64 {
 	var normA float64
 	var normB float64
-	for i, av := range a {
+	for _, av := range a {
 		normA += math.Pow(av, 2)
-		normB += math.Pow(b[i], 2)
+	}
+	for _, av := range b {
+		normB += math.Pow(av, 2)
 	}
 	if normA == 0 || normB == 0 {
 		return 0
@@ -24,9 +26,8 @@ func Keys(m map[string]float64) (keys []string) {
 	return keys
 }
 
-
 func Vals(m map[string]float64) (vals []float64) {
-	for _,v := range m {
+	for _, v := range m {
 		vals = append(vals, v)
 	}
 	return vals
@@ -40,7 +41,7 @@ func getIntersection(a, b map[string]float64) (keys []string) {
 	}
 	return keys
 }
-func dot(a, b map[string]float64, intersection []string)(dotProduct float64){
+func dot(a, b map[string]float64, intersection []string) (dotProduct float64) {
 	for _, av := range intersection {
 		dotProduct += a[av] * b[av]
 	}
@@ -48,6 +49,6 @@ func dot(a, b map[string]float64, intersection []string)(dotProduct float64){
 }
 
 func similarity(a, b map[string]float64) float64 {
-	dot := dot(a,b,getIntersection(a, b))
+	dot := dot(a, b, getIntersection(a, b))
 	return similarityVector(Vals(a), Vals(b), dot)
 }

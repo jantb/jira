@@ -99,11 +99,7 @@ func (d *searchIndex) calculateSimularities(key, data string) error {
 	}
 
 	tfidfdata := tfidfcache[key]
-
-	fmt.Println("generating similarity against all other documents")
-	t := time.Now()
 	var similarities []similaritystruct
-	var count int
 	for k, value := range tfidfcache {
 		if k == key {
 			continue
@@ -112,11 +108,7 @@ func (d *searchIndex) calculateSimularities(key, data string) error {
 			Key:k,
 			Similarity:similarity(tfidfdata, value),
 		})
-		count++
-		fmt.Printf("\r%d of %d",count , len(tfidfcache) )
 	}
-	fmt.Println()
-	fmt.Println(time.Now().Sub(t))
 	slice.Sort(similarities, func(i, j int) bool {
 		return similarities[i].Similarity < similarities[j].Similarity
 	})

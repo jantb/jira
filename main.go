@@ -39,15 +39,16 @@ func main() {
 				continue
 			}
 			if len(list) == 0 {
-				fmt.Println()
 				resSearch, err := index.SearchAllMatching(1000000)
 				if err != nil {
 					log.Panic(err)
 				}
-				for i, value := range resSearch {
-					fmt.Println(i)
+				for _, value := range resSearch {
 					var issue jira.Issue
-					json.Unmarshal(value, &issue)
+					err := json.Unmarshal(value, &issue)
+					if err != nil {
+						continue
+					}
 					index.calculateSimularities(issue.Key, string(value))
 				}
 
