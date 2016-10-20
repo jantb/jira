@@ -4,31 +4,50 @@ import (
 	"math"
 )
 
-func similarityVector(a,b []float64)float64{
-	var dotProduct float64
+func similarityVector(a, b []float64, dot float64) float64 {
 	var normA float64
 	var normB float64
 	for i, av := range a {
-		dotProduct += av * b[i]
 		normA += math.Pow(av, 2)
 		normB += math.Pow(b[i], 2)
 	}
-	return dotProduct/(math.Sqrt(normA) *math.Sqrt(normB))
+	if normA == 0 || normB == 0 {
+		return 0
+	}
+	return dot / (math.Sqrt(normA) * math.Sqrt(normB))
 }
-func similarity(a,b map[string]float64)float64{
-	m := make(map[string][]float64)
-	for key, va := range a {
-		vb :=b[key]
-		m[key] = []float64{va,vb}
+
+func Keys(m map[string]float64) (keys []string) {
+	for k := range m {
+		keys = append(keys, k)
 	}
-	for key, vb := range b {
-		va :=a[key]
-		m[key] = []float64{va,vb}
+	return keys
+}
+
+
+func Vals(m map[string]float64) (vals []float64) {
+	for _,v := range m {
+		vals = append(vals, v)
 	}
-	var vecA, vecB []float64
-	for _, value := range m {
-		vecA = append(vecA,value[0])
-		vecB = append(vecB,value[1])
+	return vals
+}
+
+func getIntersection(a, b map[string]float64) (keys []string) {
+	for _, value := range Keys(a) {
+		if _, ok := b[value]; ok {
+			keys = append(keys, value)
+		}
 	}
-	return similarityVector(vecA,vecB)
+	return keys
+}
+func dot(a, b map[string]float64, intersection []string)(dotProduct float64){
+	for _, av := range intersection {
+		dotProduct += a[av] * b[av]
+	}
+	return dotProduct
+}
+
+func similarity(a, b map[string]float64) float64 {
+	dot := dot(a,b,getIntersection(a, b))
+	return similarityVector(Vals(a), Vals(b), dot)
 }
