@@ -10,7 +10,6 @@ import (
 	"os"
 )
 
-
 var index searchIndex
 var conf config
 var indexIssues = flag.Bool("index", false, "Index jira, and generate similarities, uses a timestamp to only update new issues")
@@ -31,22 +30,10 @@ func main() {
 	}
 	index = Open()
 	if *indexIssues {
-		resSearch, err := index.SearchAllMatching(1000000)
-		if err != nil {
-			log.Panic(err)
-		}
-		for i, value := range resSearch {
-			fmt.Println(i)
-			var issue jira.Issue
-			json.Unmarshal(value, &issue)
-			index.calculateSimularities(issue.Key, string(value))
-		}
-
-		os.Exit(0)
-
 		now := time.Now()
 		for i := 0; ; i += 100 {
-			list, _, _ := jiraClient.Issue.Search("project=" + conf.Project, &jira.SearchOptions{StartAt:i, MaxResults:i + 100})
+			searchString := "project=" + conf.Project + " AND updated > '" + conf.LastUpdate.Format("2006/01/02 15:04" + "'")
+			list, _, _ := jiraClient.Issue.Search(searchString, &jira.SearchOptions{StartAt:i, MaxResults:i + 100})
 			if len(list) == 0 {
 				resSearch, err := index.SearchAllMatching(1000000)
 				if err != nil {
@@ -69,7 +56,7 @@ func main() {
 					log.Panic(err)
 				}
 			}
-			fmt.Println(i)
+			fmt.Printf("\r%d", i)
 		}
 	}
 
