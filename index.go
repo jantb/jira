@@ -41,14 +41,18 @@ func (d *searchIndex) Index(key string, data interface{}) error {
 
 	return err
 }
-func (d *searchIndex) SearchAllMatching(count int) ([][]byte, error) {
-	var res [][]byte
+type Res struct {
+	key string
+	value string
+}
+func (d *searchIndex) SearchAllMatching(count int) ([]Res, error) {
+	var res []Res
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("store"))
 		c := b.Cursor()
 
 		for k, v := c.First(); k != nil && count > 0; k, v = c.Next() {
-			res = append(res, v)
+			res = append(res, Res{key:string(k), value:string(v)})
 			count--
 		}
 		return nil
@@ -91,11 +95,12 @@ func (d *searchIndex) calculateSimularities(key, data string) error {
 
 		m[key] = data
 		fmt.Println()
-		fmt.Println("generating tf-idf map...")
+		fmt.Print("generating tf-idf map... ")
 		tfidfcache = tfidfMap(m)
 		fmt.Println(time.Now().Sub(t))
 	}
-
+	t := time.Now()
+	fmt.Print("\rgenerating similarities map... " + key + " ")
 	tfidfdata := tfidfcache[key]
 	var similarities []similaritystruct
 	for k, value := range tfidfcache {
@@ -108,7 +113,7 @@ func (d *searchIndex) calculateSimularities(key, data string) error {
 		})
 	}
 	slice.Sort(similarities, func(i, j int) bool {
-		return similarities[i].Similarity < similarities[j].Similarity
+		return similarities[i].Similarity > similarities[j].Similarity
 	})
 
 	similaritiesb, err := json.Marshal(similarities)
@@ -120,7 +125,7 @@ func (d *searchIndex) calculateSimularities(key, data string) error {
 		b.Put([]byte(key), similaritiesb)
 		return nil
 	})
-
+	fmt.Print(time.Now().Sub(t))
 	return nil
 }
 

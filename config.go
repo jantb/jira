@@ -14,6 +14,7 @@ type config struct {
 	Password   string
 	JiraServer string
 	Project string
+	Filter string
 	LastUpdate time.Time
 }
 

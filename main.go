@@ -8,6 +8,9 @@ import (
 	"time"
 	"flag"
 	"os"
+	"io/ioutil"
+	"encoding/xml"
+	"strings"
 )
 
 var index searchIndex
@@ -17,6 +20,8 @@ var indexIssues = flag.Bool("index", false, "Index jira, and generate similariti
 func main() {
 	flag.Parse()
 	conf.load()
+	os.Args = flag.Args()
+
 	jiraClient, err := jira.NewClient(nil, conf.JiraServer)
 	if err != nil {
 		panic(err)
@@ -48,14 +53,8 @@ func main() {
 				if err != nil {
 					log.Panic(err)
 				}
-				for i, value := range resSearch {
-					fmt.Printf("\r%d",i)
-					var issue jira.Issue
-					err := json.Unmarshal(value, &issue)
-					if err != nil {
-						continue
-					}
-					index.calculateSimularities(issue.Key, string(value))
+				for _, value := range resSearch {
+					index.calculateSimularities(value.key, value.value)
 				}
 
 				conf.LastUpdate = now
@@ -63,7 +62,7 @@ func main() {
 				os.Exit(0)
 			}
 			for _, l := range list {
-				err = index.Index(l.Key, l)
+				err = index.Index(l.Key, fmt.Sprintf("%s %s", l.Fields.Summary, l.Fields.Description))
 				if err != nil {
 					log.Panic(err)
 				}
@@ -72,15 +71,32 @@ func main() {
 		}
 	}
 
-	resSearch, err := index.SearchAllMatching(1000)
-	if err != nil {
-		log.Panic(err)
+	if len(os.Args) == 1 {
+		list, _, _ := jiraClient.Issue.Search("key = " + os.Args[0], &jira.SearchOptions{StartAt:0, MaxResults:100})
+		for _, value := range list {
+			printIssueDet(value)
+			fmt.Println("\nSimilar issues:")
+			sim, _ := index.getSimularities(value.Key)
+			keys := ""
+			for _, value := range sim[:10] {
+				if len(keys) != 0 {
+					keys += ","
+				}
+				keys += value.Key
+			}
+			list, _, _ := jiraClient.Issue.Search("key in (" + keys + ")", &jira.SearchOptions{StartAt:0, MaxResults:100})
+			for _, value := range list {
+				printIssue(value)
+			}
+			fmt.Print("\n")
+		}
+		return
 	}
-	for _, value := range resSearch {
-		var issue jira.Issue
-		json.Unmarshal(value, &issue)
+	searchString := "filter=" + conf.Filter
+	list, _, _ := jiraClient.Issue.Search(searchString, &jira.SearchOptions{StartAt:0, MaxResults:100})
+	fmt.Println("Next fix version " + getNextFixVersion())
+	for _, issue := range list {
 		printIssue(issue)
-		printSimularities(issue)
 	}
 
 }
@@ -91,6 +107,33 @@ func printSimularities(issue jira.Issue) {
 		fmt.Print(value.Key + " ")
 	}
 	fmt.Print("\n")
+}
+func printIssueDet(issue jira.Issue) {
+	var fix = ""
+	for _, fixversion := range issue.Fields.FixVersions {
+		if (len(fix) == 0) {
+			fix += fixversion.Name
+		} else {
+			fix += ", " + fixversion.Name
+		}
+	}
+	fmt.Printf("\033[32m%-10s\033[m ", issue.Fields.Created)
+	fmt.Printf("\033[33m%-10s\033[m ", issue.Fields.Status.Name)
+	fmt.Printf("\033[34m%-10s\033[m ", issue.Fields.Creator.Name)
+	fmt.Printf("\033[35m%-10s\033[m ", issue.Fields.Assignee.Name)
+	fmt.Printf("\033[36m%-10s\033[m ", fix)
+	fmt.Printf("\n%s\n", issue.Fields.Summary)
+	fmt.Print("\n", )
+	fmt.Printf("%s\n", issue.Fields.Description)
+
+	if issue.Fields.Comments != nil {
+		fmt.Printf("%s\n", "Comments:")
+		for _, comment := range issue.Fields.Comments.Comments {
+			fmt.Printf("%s \033[0;36m%s\033[m %s\n", comment.Created, comment.Author.Name, comment.Body)
+		}
+	}
+
+	fmt.Printf("\033[34m%-10s\033[m\n", "http://" + conf.JiraServer + "/browse/" + issue.Key)
 }
 func printIssue(issue jira.Issue) {
 	var priorityValue = issue.Fields.Priority.Name
@@ -129,4 +172,20 @@ func printIssue(issue jira.Issue) {
 	}
 	fmt.Printf("%-15s %-15s %-10s %-10s %-10s %-20s %-20s %s\n",
 		key, updated[:len("2006-01-02T15:04:05")], priority, assignee, creator, fix, status, summary)
+}
+
+func getNextFixVersion() string {
+	type Result struct {
+		Value string `xml:"version"`
+	}
+	bytes, err := ioutil.ReadFile("pom.xml")
+	if err != nil {
+		return ""
+	}
+	var pom Result
+	err = xml.Unmarshal(bytes, &pom)
+	if err != nil {
+		log.Panic(err)
+	}
+	return pom.Value[:strings.Index(pom.Value, "-")]
 }
