@@ -100,14 +100,6 @@ func main() {
 	}
 
 }
-
-func printSimularities(issue jira.Issue) {
-	sim, _ := index.getSimularities(issue.Key)
-	for _, value := range sim[:10] {
-		fmt.Print(value.Key + " ")
-	}
-	fmt.Print("\n")
-}
 func printIssueDet(issue jira.Issue) {
 	var fix = ""
 	for _, fixversion := range issue.Fields.FixVersions {
