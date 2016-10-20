@@ -38,12 +38,18 @@ func main() {
 				i -= 100
 				continue
 			}
-			if len(list) == 0 {
+			if i == 0 && len(list) == 0 {
+				conf.LastUpdate = now
+				conf.store()
+				os.Exit(0)
+			}
+			if len(list) == 0 && i > 0 {
 				resSearch, err := index.SearchAllMatching(1000000)
 				if err != nil {
 					log.Panic(err)
 				}
-				for _, value := range resSearch {
+				for i, value := range resSearch {
+					fmt.Printf("\r%d",i)
 					var issue jira.Issue
 					err := json.Unmarshal(value, &issue)
 					if err != nil {
@@ -80,8 +86,6 @@ func main() {
 }
 
 func printSimularities(issue jira.Issue) {
-	b, _ := json.Marshal(issue)
-	index.calculateSimularities(issue.Key, string(b))
 	sim, _ := index.getSimularities(issue.Key)
 	for _, value := range sim[:10] {
 		fmt.Print(value.Key + " ")

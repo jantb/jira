@@ -45,14 +45,12 @@ func (d *searchIndex) SearchAllMatching(count int) ([][]byte, error) {
 	var res [][]byte
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("store"))
-		b.ForEach(func(k, v []byte) error {
+		c := b.Cursor()
+
+		for k, v := c.First(); k != nil && count > 0; k, v = c.Next() {
 			res = append(res, v)
 			count--
-			if count == 0 {
-				return nil
-			}
-			return nil
-		})
+		}
 		return nil
 	})
 	return res, err
@@ -92,9 +90,9 @@ func (d *searchIndex) calculateSimularities(key, data string) error {
 		}
 
 		m[key] = data
+		fmt.Println()
 		fmt.Println("generating tf-idf map...")
 		tfidfcache = tfidfMap(m)
-		fmt.Println()
 		fmt.Println(time.Now().Sub(t))
 	}
 

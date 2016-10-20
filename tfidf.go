@@ -3,10 +3,13 @@ package main
 import (
 	"strings"
 	"math"
+	"unicode"
 )
 
 func toLower(words string) []string {
-	return strings.Fields(strings.ToLower(words))
+	return strings.FieldsFunc(strings.ToLower(words), func(r rune) bool {
+		return unicode.IsSpace(r)|| unicode.IsSymbol(r) || unicode.IsPunct(r)
+	})
 }
 
 func removeNorwegianStopwords(words []string) []string {
