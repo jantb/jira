@@ -46,7 +46,7 @@ func main() {
 	if *indexIssues {
 		now := time.Now()
 		for i := 0; ; i += 100 {
-			searchString := "project=" + conf.Project + " AND updated > '" + conf.LastUpdate.Format("2006/01/02 15:04" + "'")
+			searchString := "project in (" + conf.Project + ") AND updated > '" + conf.LastUpdate.Format("2006/01/02 15:04" + "'")
 			list, _, err := jiraClient.Issue.Search(searchString, &jira.SearchOptions{StartAt:i, MaxResults:100})
 			if err != nil {
 				i -= 100
@@ -68,6 +68,9 @@ func main() {
 
 				conf.LastUpdate = now
 				conf.store()
+				fmt.Println()
+				fmt.Println("Done indexing")
+
 				os.Exit(0)
 			}
 			for _, l := range list {
@@ -130,7 +133,9 @@ func printIssueDet(issue jira.Issue) {
 	fmt.Printf("\033[32m%-10s\033[m ", issue.Fields.Created)
 	fmt.Printf("\033[33m%-10s\033[m ", issue.Fields.Status.Name)
 	fmt.Printf("\033[34m%-10s\033[m ", issue.Fields.Creator.Name)
-	fmt.Printf("\033[35m%-10s\033[m ", issue.Fields.Assignee.Name)
+	if issue.Fields.Assignee != nil {
+		fmt.Printf("\033[35m%-10s\033[m ", issue.Fields.Assignee.Name)
+	}
 	fmt.Printf("\033[36m%-10s\033[m ", fix)
 	fmt.Printf("\n%s\n", issue.Fields.Summary)
 	fmt.Print("\n", )
@@ -143,7 +148,7 @@ func printIssueDet(issue jira.Issue) {
 		}
 	}
 
-	fmt.Printf("\033[34m%-10s\033[m\n", "http://" + conf.JiraServer + "/browse/" + issue.Key)
+	fmt.Printf("\033[34m%-10s\033[m\n",  conf.JiraServer + "browse/" + issue.Key)
 }
 func printIssue(issue jira.Issue) {
 	var priorityValue = issue.Fields.Priority.Name
