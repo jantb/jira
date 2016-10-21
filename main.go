@@ -131,6 +131,7 @@ func printIssueDet(issue jira.Issue) {
 		}
 	}
 	fmt.Printf("\033[32m%-10s\033[m ", issue.Fields.Created)
+	fmt.Printf("\033[31m%-10s\033[m ", issue.Fields.Type.Name)
 	fmt.Printf("\033[33m%-10s\033[m ", issue.Fields.Status.Name)
 	fmt.Printf("\033[34m%-10s\033[m ", issue.Fields.Creator.Name)
 	if issue.Fields.Assignee != nil {
