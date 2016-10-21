@@ -133,7 +133,9 @@ func printIssueDet(issue jira.Issue) {
 	fmt.Printf("\033[32m%-10s\033[m ", issue.Fields.Created)
 	fmt.Printf("\033[31m%-10s\033[m ", issue.Fields.Type.Name)
 	fmt.Printf("\033[33m%-10s\033[m ", issue.Fields.Status.Name)
-	fmt.Printf("\033[34m%-10s\033[m ", issue.Fields.Creator.Name)
+	if issue.Fields.Creator != nil {
+		fmt.Printf("\033[34m%-10s\033[m ", issue.Fields.Creator.Name)
+	}
 	if issue.Fields.Assignee != nil {
 		fmt.Printf("\033[35m%-10s\033[m ", issue.Fields.Assignee.Name)
 	}
@@ -153,7 +155,10 @@ func printIssueDet(issue jira.Issue) {
 }
 func printIssue(issue jira.Issue) {
 	var priorityValue = issue.Fields.Priority.Name
-	var creator = issue.Fields.Creator.Name
+	var creator = ""
+	if issue.Fields.Creator != nil {
+		creator = issue.Fields.Creator.Name
+	}
 	var assignee = ""
 	if issue.Fields.Assignee != nil {
 		assignee = issue.Fields.Assignee.Name
