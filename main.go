@@ -16,11 +16,20 @@ import (
 var index searchIndex
 var conf config
 var indexIssues = flag.Bool("index", false, "Index jira, and generate similarities, uses a timestamp to only update new issues")
+var clearIndex = flag.Bool("clearIndex", false, "Clear the index and reset the timestamp")
 
 func main() {
 	flag.Parse()
 	conf.load()
 	os.Args = flag.Args()
+	index = Open()
+
+	if *clearIndex {
+		conf.LastUpdate = time.Time{}
+		conf.store()
+		index.Clear()
+		os.Exit(0)
+	}
 
 	jiraClient, err := jira.NewClient(nil, conf.JiraServer)
 	if err != nil {
@@ -33,7 +42,7 @@ func main() {
 		fmt.Printf("Invalid config:\n%s\n", string(bytes))
 		panic(err)
 	}
-	index = Open()
+
 	if *indexIssues {
 		now := time.Now()
 		for i := 0; ; i += 100 {
@@ -62,7 +71,16 @@ func main() {
 				os.Exit(0)
 			}
 			for _, l := range list {
-				err = index.Index(l.Key, fmt.Sprintf("%s %s", l.Fields.Summary, l.Fields.Description))
+				comments := ""
+				if l.Fields.Comments != nil {
+					for _, comment := range l.Fields.Comments.Comments {
+						if len(comments) != 0 {
+							comments += " "
+						}
+						comments += comment.Body
+					}
+				}
+				err = index.Index(l.Key, fmt.Sprintf("%s %s %s", l.Fields.Summary, l.Fields.Description, comments))
 				if err != nil {
 					log.Panic(err)
 				}

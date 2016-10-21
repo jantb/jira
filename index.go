@@ -41,10 +41,21 @@ func (d *searchIndex) Index(key string, data interface{}) error {
 
 	return err
 }
+
 type Res struct {
-	key string
+	key   string
 	value string
 }
+
+func (d *searchIndex) Clear() {
+	d.db.Update(func(tx *bolt.Tx) error {
+		tx.DeleteBucket([]byte("store"))
+		tx.DeleteBucket([]byte("similarDocuments"))
+		return nil
+	})
+	return
+}
+
 func (d *searchIndex) SearchAllMatching(count int) ([]Res, error) {
 	var res []Res
 	err := d.db.View(func(tx *bolt.Tx) error {
@@ -100,7 +111,7 @@ func (d *searchIndex) calculateSimularities(key, data string) error {
 		fmt.Println(time.Now().Sub(t))
 	}
 	t := time.Now()
-	fmt.Print("\rgenerating similarities map... " + key + " ")
+	fmt.Print("                                           \rgenerating similarities map... " + key + " ")
 	tfidfdata := tfidfcache[key]
 	var similarities []similaritystruct
 	for k, value := range tfidfcache {
