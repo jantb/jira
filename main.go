@@ -1,16 +1,16 @@
 package main
 
 import (
-	"github.com/andygrunwald/go-jira"
-	"fmt"
-	"log"
 	"encoding/json"
-	"time"
-	"flag"
-	"os"
-	"io/ioutil"
 	"encoding/xml"
+	"flag"
+	"fmt"
+	"github.com/andygrunwald/go-jira"
+	"io/ioutil"
+	"log"
+	"os"
 	"strings"
+	"time"
 )
 
 var index searchIndex
@@ -46,8 +46,8 @@ func main() {
 	if *indexIssues {
 		now := time.Now()
 		for i := 0; ; i += 100 {
-			searchString := "project in (" + conf.Project + ") AND updated > '" + conf.LastUpdate.Format("2006/01/02 15:04" + "'")
-			list, _, err := jiraClient.Issue.Search(searchString, &jira.SearchOptions{StartAt:i, MaxResults:100})
+			searchString := "project in (" + conf.Project + ") AND updated > '" + conf.LastUpdate.Format("2006/01/02 15:04"+"'")
+			list, _, err := jiraClient.Issue.Search(searchString, &jira.SearchOptions{StartAt: i, MaxResults: 100})
 			if err != nil {
 				i -= 100
 				continue
@@ -93,38 +93,47 @@ func main() {
 	}
 
 	if len(os.Args) == 1 {
-		list, _, _ := jiraClient.Issue.Search("key = " + os.Args[0], &jira.SearchOptions{StartAt:0, MaxResults:100})
+		list, _, _ := jiraClient.Issue.Search("key = "+os.Args[0], &jira.SearchOptions{StartAt: 0, MaxResults: 100})
 		for _, value := range list {
 			printIssueDet(value)
 			fmt.Println("\nSimilar issues:")
 			sim, _ := index.getSimularities(value.Key)
 			keys := ""
-			for _, value := range sim[:10] {
+			for _, value := range sim[:25] {
 				if len(keys) != 0 {
 					keys += ","
 				}
 				keys += value.Key
 			}
-			list, _, _ := jiraClient.Issue.Search("key in (" + keys + ")", &jira.SearchOptions{StartAt:0, MaxResults:100})
+			list, _, _ := jiraClient.Issue.Search("key in ("+keys+")", &jira.SearchOptions{StartAt: 0, MaxResults: 100})
 			for _, value := range list {
 				printIssue(value)
 			}
 			fmt.Print("\n")
 		}
+
+		if len(list) == 0 {
+			list, _, _ := jiraClient.Issue.Search("text ~ \""+os.Args[0]+"\" ", &jira.SearchOptions{StartAt: 0, MaxResults: 100})
+			for _, value := range list {
+				printIssue(value)
+			}
+		}
 		return
 	}
+
 	searchString := "filter=" + conf.Filter
-	list, _, _ := jiraClient.Issue.Search(searchString, &jira.SearchOptions{StartAt:0, MaxResults:100})
+	list, _, _ := jiraClient.Issue.Search(searchString, &jira.SearchOptions{StartAt: 0, MaxResults: 100})
 	fmt.Println("Next fix version " + getNextFixVersion())
 	for _, issue := range list {
 		printIssue(issue)
 	}
 
 }
+
 func printIssueDet(issue jira.Issue) {
 	var fix = ""
 	for _, fixversion := range issue.Fields.FixVersions {
-		if (len(fix) == 0) {
+		if len(fix) == 0 {
 			fix += fixversion.Name
 		} else {
 			fix += ", " + fixversion.Name
@@ -141,7 +150,7 @@ func printIssueDet(issue jira.Issue) {
 	}
 	fmt.Printf("\033[36m%-10s\033[m ", fix)
 	fmt.Printf("\n%s\n", issue.Fields.Summary)
-	fmt.Print("\n", )
+	fmt.Print("\n")
 	fmt.Printf("%s\n", issue.Fields.Description)
 
 	if issue.Fields.Comments != nil {
@@ -151,8 +160,9 @@ func printIssueDet(issue jira.Issue) {
 		}
 	}
 
-	fmt.Printf("\033[34m%-10s\033[m\n",  conf.JiraServer + "browse/" + issue.Key)
+	fmt.Printf("\033[34m%-10s\033[m\n", conf.JiraServer+"browse/"+issue.Key)
 }
+
 func printIssue(issue jira.Issue) {
 	var priorityValue = issue.Fields.Priority.Name
 	var creator = ""
