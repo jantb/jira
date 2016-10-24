@@ -99,6 +99,10 @@ func main() {
 			fmt.Println("\nSimilar issues:")
 			sim, _ := index.getSimularities(value.Key)
 			keys := ""
+			if len(sim) == 0 {
+				fmt.Println("No similar issues found, please run jira -index to generate them for this issue")
+				return
+			}
 			for _, value := range sim[:25] {
 				if len(keys) != 0 {
 					keys += ","
