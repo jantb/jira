@@ -11,6 +11,8 @@ import (
 	"os"
 	"strings"
 	"time"
+	"path/filepath"
+	"os/user"
 )
 
 var index searchIndex
@@ -38,9 +40,14 @@ func main() {
 
 	_, err = jiraClient.Authentication.AcquireSessionCookie(conf.Username, conf.Password)
 	if err != nil {
+		usr, err := user.Current()
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		bytes, _ := json.MarshalIndent(conf, "", "    ")
-		fmt.Printf("Invalid config:\n%s\n", string(bytes))
-		panic(err)
+		fmt.Printf("Invalid config in %s:\n%s\n", filepath.Join(usr.HomeDir, ".jira.conf"),string(bytes))
+		os.Exit(0)
 	}
 
 	if *indexIssues {
