@@ -1,13 +1,13 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"github.com/boltdb/bolt"
-	"path/filepath"
+	"github.com/bradfitz/slice"
 	"log"
 	"os/user"
-	"encoding/json"
-	"github.com/bradfitz/slice"
-	"fmt"
+	"path/filepath"
 	"time"
 )
 
@@ -18,6 +18,8 @@ type searchIndex struct {
 func Open() searchIndex {
 	datastore := searchIndex{}
 	datastore.db = getDb()
+	//v, _ := json.MarshalIndent(datastore.db.Stats(), "", "    ")
+	//fmt.Println(string(v))
 	return datastore
 }
 
@@ -63,7 +65,7 @@ func (d *searchIndex) SearchAllMatching(count int) ([]Res, error) {
 		c := b.Cursor()
 
 		for k, v := c.First(); k != nil && count > 0; k, v = c.Next() {
-			res = append(res, Res{key:string(k), value:string(v)})
+			res = append(res, Res{key: string(k), value: string(v)})
 			count--
 		}
 		return nil
@@ -119,15 +121,15 @@ func (d *searchIndex) calculateSimularities(key, data string) error {
 			continue
 		}
 		similarities = append(similarities, similaritystruct{
-			Key:k,
-			Similarity:similarity(tfidfdata, value),
+			Key:        k,
+			Similarity: similarity(tfidfdata, value),
 		})
 	}
 	slice.Sort(similarities, func(i, j int) bool {
 		return similarities[i].Similarity > similarities[j].Similarity
 	})
 
-	similaritiesb, err := json.Marshal(similarities)
+	similaritiesb, err := json.Marshal(similarities[:20])
 	if err != nil {
 		return err
 	}

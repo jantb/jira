@@ -1,14 +1,14 @@
 package main
 
 import (
-	"strings"
 	"math"
+	"strings"
 	"unicode"
 )
 
 func toLower(words string) []string {
 	return strings.FieldsFunc(strings.ToLower(words), func(r rune) bool {
-		return unicode.IsSpace(r)|| unicode.IsSymbol(r) || unicode.IsPunct(r)
+		return unicode.IsSpace(r) || unicode.IsSymbol(r) || unicode.IsPunct(r)
 	})
 }
 
@@ -21,21 +21,22 @@ func removeNorwegianStopwords(words []string) []string {
 	var vår ved verdi vi vil ville vite være vært`)
 	var ret []string
 	for _, word := range words {
-		found := false
+		if len(word) < 4 {
+			continue
+		}
+
 		for _, stopword := range stopwords {
 			if stopword == word {
-				found = true
+				continue
 			}
 		}
-		if !found {
-			ret = append(ret, word)
-		}
+		ret = append(ret, word)
 	}
 
 	return ret
 }
 
-func wf(words []string) (map[string]int) {
+func wf(words []string) map[string]int {
 	m := make(map[string]int)
 	for _, word := range words {
 		if _, exists := m[word]; exists {
@@ -75,10 +76,10 @@ func set(words []string) []string {
 	return set
 }
 
-func tf(string string) (map[string]float64) {
+func tf(string string) map[string]float64 {
 	return normalize(wf(removeNorwegianStopwords(toLower(string))))
 }
-func idf(strings []string) (map[string]float64) {
+func idf(strings []string) map[string]float64 {
 	d := float64(len(strings))
 	var words []string
 	for _, s := range strings {
@@ -91,7 +92,7 @@ func idf(strings []string) (map[string]float64) {
 	return idfMap
 }
 
-func tfidf(documents []string) (map[string]map[string]float64) {
+func tfidf(documents []string) map[string]map[string]float64 {
 	tfidfMap := make(map[string]map[string]float64)
 	idf := idf(documents)
 
@@ -106,7 +107,7 @@ func tfidf(documents []string) (map[string]map[string]float64) {
 
 	return tfidfMap
 }
-func tfidfMap(documents map[string]string) (map[string]map[string]float64) {
+func tfidfMap(documents map[string]string) map[string]map[string]float64 {
 	tfidfMap := make(map[string]map[string]float64)
 	var d []string
 	for _, document := range documents {
