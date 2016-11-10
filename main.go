@@ -9,10 +9,10 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/user"
+	"path/filepath"
 	"strings"
 	"time"
-	"path/filepath"
-	"os/user"
 )
 
 var index searchIndex
@@ -46,7 +46,7 @@ func main() {
 		}
 
 		bytes, _ := json.MarshalIndent(conf, "", "    ")
-		fmt.Printf("Invalid config in %s:\n%s\n", filepath.Join(usr.HomeDir, ".jira.conf"),string(bytes))
+		fmt.Printf("Invalid config in %s:\n%s\n", filepath.Join(usr.HomeDir, ".jira.conf"), string(bytes))
 		os.Exit(0)
 	}
 
@@ -110,7 +110,7 @@ func main() {
 				fmt.Println("No similar issues found, please run jira -index to generate them for this issue")
 				return
 			}
-			for _, value := range sim[:25] {
+			for _, value := range sim {
 				if len(keys) != 0 {
 					keys += ","
 				}
