@@ -40,6 +40,7 @@ func main() {
 
 	_, err = jiraClient.Authentication.AcquireSessionCookie(conf.Username, conf.Password)
 	if err != nil {
+		fmt.Printf("%s\n", err)
 		usr, err := user.Current()
 		if err != nil {
 			log.Fatal(err)
@@ -51,12 +52,15 @@ func main() {
 	}
 
 	if *indexIssues {
+		fmt.Printf("Starting indexing...\n")
 		now := time.Now()
 		for i := 0; ; i += 100 {
 			searchString := "project in (" + conf.Project + ") AND updated > '" + conf.LastUpdate.Format("2006/01/02 15:04"+"'")
-			list, _, err := jiraClient.Issue.Search(searchString, &jira.SearchOptions{StartAt: i, MaxResults: 100})
+			list, response, err := jiraClient.Issue.Search(searchString, &jira.SearchOptions{StartAt: i, MaxResults: 100})
 			if err != nil {
 				i -= 100
+				b, _ := ioutil.ReadAll(response.Body)
+				fmt.Printf("Rolling back 100 commits to get around the error %s %s\n", err, b)
 				continue
 			}
 			if i == 0 && len(list) == 0 {
@@ -176,6 +180,7 @@ func printIssueDet(issue jira.Issue) {
 
 func printIssue(issue jira.Issue) {
 	var priorityValue = issue.Fields.Priority.Name
+	var priorityId = issue.Fields.Priority.ID
 	var creator = ""
 	if issue.Fields.Creator != nil {
 		creator = issue.Fields.Creator.Name
@@ -197,11 +202,11 @@ func printIssue(issue jira.Issue) {
 		fix += value.Name
 	}
 	var priority = ""
-	if priorityValue == "Minor" {
+	if priorityId == "3" {
 		priority = fmt.Sprintf("\033[0;32m%-10s\033[m", priorityValue)
-	} else if priorityValue == "Major" {
+	} else if priorityId == "1" {
 		priority = fmt.Sprintf("\033[0;31m%-10s\033[m", priorityValue)
-	} else if priorityValue == "Blocker" {
+	} else if priorityId == "2" {
 		priority = fmt.Sprintf("\033[0;30;41m%-10s\033[m", priorityValue)
 	} else {
 		priority = fmt.Sprintf("%s", priorityValue)
