@@ -51,56 +51,44 @@ func main() {
 		os.Exit(0)
 	}
 
-	if *indexIssues {
-		fmt.Printf("Starting indexing...\n")
-		now := time.Now()
-		for i := 0; ; i += 100 {
-			searchString := "project in (" + conf.Project + ") AND updated > '" + conf.LastUpdate.Format("2006/01/02 15:04"+"'")
-			list, response, err := jiraClient.Issue.Search(searchString, &jira.SearchOptions{StartAt: i, MaxResults: 100})
-			if err != nil {
-				i -= 100
-				b, _ := ioutil.ReadAll(response.Body)
-				fmt.Printf("Rolling back 100 commits to get around the error %s %s\n", err, b)
-				continue
-			}
-			if i == 0 && len(list) == 0 {
-				conf.LastUpdate = now
-				conf.store()
-				os.Exit(0)
-			}
-			if len(list) == 0 && i > 0 {
-				resSearch, err := index.SearchAllMatching(1000000)
-				if err != nil {
-					log.Panic(err)
-				}
-				for _, value := range resSearch {
-					index.calculateSimularities(value.key, value.value)
-				}
-
-				conf.LastUpdate = now
-				conf.store()
-				fmt.Println()
-				fmt.Println("Done indexing")
-
-				os.Exit(0)
-			}
-			for _, l := range list {
-				comments := ""
-				if l.Fields.Comments != nil {
-					for _, comment := range l.Fields.Comments.Comments {
-						if len(comments) != 0 {
-							comments += " "
-						}
-						comments += comment.Body
-					}
-				}
-				err = index.Index(l.Key, fmt.Sprintf("%s %s %s", l.Fields.Summary, l.Fields.Description, comments))
-				if err != nil {
-					log.Panic(err)
-				}
-			}
-			fmt.Printf("\r%d", i)
+	now := time.Now()
+	for i := 0; ; i += 100 {
+		searchString := "project in (" + conf.Project + ") AND updated > '" + conf.LastUpdate.Format("2006/01/02 15:04"+"'")
+		list, response, err := jiraClient.Issue.Search(searchString, &jira.SearchOptions{StartAt: i, MaxResults: 100})
+		if err != nil {
+			i -= 100
+			b, _ := ioutil.ReadAll(response.Body)
+			fmt.Printf("Rolling back 100 commits to get around the error %s %s\n", err, b)
+			continue
 		}
+		if i == 0 && len(list) == 0 {
+			conf.LastUpdate = now
+			conf.store()
+			break
+		}
+		if len(list) == 0 && i > 0 {
+			conf.LastUpdate = now
+			conf.store()
+			fmt.Println()
+			fmt.Println("Done indexing")
+			break
+		}
+		for _, l := range list {
+			comments := ""
+			if l.Fields.Comments != nil {
+				for _, comment := range l.Fields.Comments.Comments {
+					if len(comments) != 0 {
+						comments += " "
+					}
+					comments += comment.Body
+				}
+			}
+			err = index.Index(l.Key, fmt.Sprintf("%s %s %s", l.Fields.Summary, l.Fields.Description, comments))
+			if err != nil {
+				log.Panic(err)
+			}
+		}
+		fmt.Printf("\r%d", i)
 	}
 
 	if len(os.Args) == 1 {
@@ -108,6 +96,13 @@ func main() {
 		for _, value := range list {
 			printIssueDet(value)
 			fmt.Println("\nSimilar issues:")
+			resSearch, err := index.getKey(value.Key)
+			if err != nil {
+				log.Panic(err)
+			}
+			index.calculateSimularities(resSearch.key, resSearch.value)
+
+			fmt.Println("\n")
 			sim, _ := index.getSimularities(value.Key)
 			keys := ""
 			if len(sim) == 0 {
@@ -204,9 +199,9 @@ func printIssue(issue jira.Issue) {
 	var priority = ""
 	if priorityId == "3" {
 		priority = fmt.Sprintf("\033[0;32m%-10s\033[m", priorityValue)
-	} else if priorityId == "1" {
-		priority = fmt.Sprintf("\033[0;31m%-10s\033[m", priorityValue)
 	} else if priorityId == "2" {
+		priority = fmt.Sprintf("\033[0;31m%-10s\033[m", priorityValue)
+	} else if priorityId == "1" {
 		priority = fmt.Sprintf("\033[0;30;41m%-10s\033[m", priorityValue)
 	} else {
 		priority = fmt.Sprintf("%s", priorityValue)

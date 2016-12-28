@@ -73,6 +73,18 @@ func (d *searchIndex) SearchAllMatching(count int) ([]Res, error) {
 	return res, err
 }
 
+func (d *searchIndex) getKey(key string) (Res, error) {
+	var res Res
+	err := d.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("store"))
+		get := b.Get([]byte(key))
+		res.key = key
+		res.value = string(get)
+		return nil
+	})
+	return res, err
+}
+
 func (d *searchIndex) getSimularities(key string) ([]similaritystruct, error) {
 	similarities := make([]similaritystruct, 0)
 	err := d.db.View(func(tx *bolt.Tx) error {
