@@ -17,7 +17,6 @@ import (
 
 var index searchIndex
 var conf config
-var indexIssues = flag.Bool("index", false, "Index jira, and generate similarities, uses a timestamp to only update new issues")
 var clearIndex = flag.Bool("clearIndex", false, "Clear the index and reset the timestamp")
 
 func main() {
