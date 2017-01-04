@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"gopkg.in/urfave/cli.v2"
 )
 
 var index searchIndex
@@ -20,18 +22,119 @@ var conf config
 var clearIndex = flag.Bool("clearIndex", false, "Clear the index and reset the timestamp")
 
 func main() {
-	flag.Parse()
-	conf.load()
-	os.Args = flag.Args()
 	index = Open()
+	conf.load()
+	app := &cli.App{
+		EnableShellCompletion: true,
+		Action: func(c *cli.Context) error {
+			indexFunc()
 
-	if *clearIndex {
-		conf.LastUpdate = time.Time{}
-		conf.store()
-		index.Clear()
+			listCurrentFilter()
+			return nil
+		},
+		Commands: []*cli.Command{
+			{
+				Name:  "show",
+				Usage: "show detailed information of an issue",
+				Action: func(c *cli.Context) error {
+					showDetails(c)
+					return nil
+				},
+				ShellComplete: func(c *cli.Context) {
+					if c.NArg() > 1 {
+						return
+					}
+					if c.NArg() == 1 {
+						res, _ := index.SearchAllMatchingSubString(c.Args().First())
+						for _, r := range res {
+							fmt.Println(r.key)
+						}
+					} else {
+						res, _ := index.SearchAllMatchingSubString("")
+						for _, r := range res {
+							fmt.Println(r.key)
+						}
+					}
+
+					fmt.Println("autocomplete")
+
+				},
+			},
+			{
+				Name:  "clearIndex",
+				Usage: "clear the current index",
+				Action: func(c *cli.Context) error {
+					conf.LastUpdate = time.Time{}
+					conf.store()
+					index.Clear()
+					return nil
+				},
+			},
+		},
+	}
+	app.Run(os.Args)
+
+}
+
+func showDetails(c *cli.Context) {
+	jiraClient, err := jira.NewClient(nil, conf.JiraServer)
+	if err != nil {
+		panic(err)
+	}
+
+	_, err = jiraClient.Authentication.AcquireSessionCookie(conf.Username, conf.Password)
+	if err != nil {
+		fmt.Printf("%s\n", err)
+		usr, err := user.Current()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		bytes, _ := json.MarshalIndent(conf, "", "    ")
+		fmt.Printf("Invalid config in %s:\n%s\n", filepath.Join(usr.HomeDir, ".jira.conf"), string(bytes))
 		os.Exit(0)
 	}
 
+	list, _, _ := jiraClient.Issue.Search("key = "+c.Args().First(), &jira.SearchOptions{StartAt: 0, MaxResults: 100})
+	for _, value := range list {
+		printIssueDet(value)
+		fmt.Println("\nSimilar issues:")
+		resSearch, err := index.getKey(value.Key)
+		if err != nil {
+			log.Panic(err)
+		}
+		index.calculateSimularities(resSearch.key, resSearch.value)
+
+		fmt.Println("\n")
+		sim, _ := index.getSimularities(value.Key)
+		keys := ""
+		if len(sim) == 0 {
+			fmt.Println("No similar issues found, please run jira -index to generate them for this issue")
+			return
+		}
+		for _, value := range sim {
+			if len(keys) != 0 {
+				keys += ","
+			}
+			keys += value.Key
+		}
+		list, _, _ := jiraClient.Issue.Search("key in ("+keys+")", &jira.SearchOptions{StartAt: 0, MaxResults: 100})
+		for _, value := range list {
+			printIssue(value)
+		}
+		fmt.Print("\n")
+	}
+
+	if len(list) == 0 {
+		list, _, _ := jiraClient.Issue.Search("text ~ \""+c.Args().First()+"\" ", &jira.SearchOptions{StartAt: 0, MaxResults: 100})
+		for _, value := range list {
+			printIssue(value)
+		}
+	}
+
+}
+
+func indexFunc() {
 	jiraClient, err := jira.NewClient(nil, conf.JiraServer)
 	if err != nil {
 		panic(err)
@@ -68,11 +171,11 @@ func main() {
 		if len(list) == 0 && i > 0 {
 			conf.LastUpdate = now
 			conf.store()
-			fmt.Println()
-			fmt.Println("Done indexing")
+			fmt.Println(" new/changed issues")
+			index.calculateTfIdf()
 			break
 		}
-		for _, l := range list {
+		for j, l := range list {
 			comments := ""
 			if l.Fields.Comments != nil {
 				for _, comment := range l.Fields.Comments.Comments {
@@ -86,48 +189,28 @@ func main() {
 			if err != nil {
 				log.Panic(err)
 			}
+			fmt.Printf("\r%d", i+j+1)
 		}
-		fmt.Printf("\r%d", i)
+	}
+}
+
+func listCurrentFilter() {
+	jiraClient, err := jira.NewClient(nil, conf.JiraServer)
+	if err != nil {
+		panic(err)
 	}
 
-	if len(os.Args) == 1 {
-		list, _, _ := jiraClient.Issue.Search("key = "+os.Args[0], &jira.SearchOptions{StartAt: 0, MaxResults: 100})
-		for _, value := range list {
-			printIssueDet(value)
-			fmt.Println("\nSimilar issues:")
-			resSearch, err := index.getKey(value.Key)
-			if err != nil {
-				log.Panic(err)
-			}
-			index.calculateSimularities(resSearch.key, resSearch.value)
-
-			fmt.Println("\n")
-			sim, _ := index.getSimularities(value.Key)
-			keys := ""
-			if len(sim) == 0 {
-				fmt.Println("No similar issues found, please run jira -index to generate them for this issue")
-				return
-			}
-			for _, value := range sim {
-				if len(keys) != 0 {
-					keys += ","
-				}
-				keys += value.Key
-			}
-			list, _, _ := jiraClient.Issue.Search("key in ("+keys+")", &jira.SearchOptions{StartAt: 0, MaxResults: 100})
-			for _, value := range list {
-				printIssue(value)
-			}
-			fmt.Print("\n")
+	_, err = jiraClient.Authentication.AcquireSessionCookie(conf.Username, conf.Password)
+	if err != nil {
+		fmt.Printf("%s\n", err)
+		usr, err := user.Current()
+		if err != nil {
+			log.Fatal(err)
 		}
 
-		if len(list) == 0 {
-			list, _, _ := jiraClient.Issue.Search("text ~ \""+os.Args[0]+"\" ", &jira.SearchOptions{StartAt: 0, MaxResults: 100})
-			for _, value := range list {
-				printIssue(value)
-			}
-		}
-		return
+		bytes, _ := json.MarshalIndent(conf, "", "    ")
+		fmt.Printf("Invalid config in %s:\n%s\n", filepath.Join(usr.HomeDir, ".jira.conf"), string(bytes))
+		os.Exit(0)
 	}
 
 	searchString := "filter=" + conf.Filter
@@ -136,9 +219,7 @@ func main() {
 	for _, issue := range list {
 		printIssue(issue)
 	}
-
 }
-
 func printIssueDet(issue jira.Issue) {
 	var fix = ""
 	for _, fixversion := range issue.Fields.FixVersions {
@@ -174,7 +255,7 @@ func printIssueDet(issue jira.Issue) {
 
 func printIssue(issue jira.Issue) {
 	var priorityValue = issue.Fields.Priority.Name
-	var priorityId = issue.Fields.Priority.ID
+	var priorityID = issue.Fields.Priority.ID
 	var creator = ""
 	if issue.Fields.Creator != nil {
 		creator = issue.Fields.Creator.Name
@@ -196,11 +277,11 @@ func printIssue(issue jira.Issue) {
 		fix += value.Name
 	}
 	var priority = ""
-	if priorityId == "3" {
+	if priorityID == "3" {
 		priority = fmt.Sprintf("\033[0;32m%-10s\033[m", priorityValue)
-	} else if priorityId == "2" {
+	} else if priorityID == "2" {
 		priority = fmt.Sprintf("\033[0;31m%-10s\033[m", priorityValue)
-	} else if priorityId == "1" {
+	} else if priorityID == "1" {
 		priority = fmt.Sprintf("\033[0;30;41m%-10s\033[m", priorityValue)
 	} else {
 		priority = fmt.Sprintf("%s", priorityValue)
