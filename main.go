@@ -198,6 +198,9 @@ func listCurrentFilter() {
 	}
 }
 func printIssueDet(issue jira.Issue) {
+	if issue == nil {
+		return
+	}
 	var fix = ""
 	for _, fixversion := range issue.Fields.FixVersions {
 		if len(fix) == 0 {
