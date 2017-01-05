@@ -3,13 +3,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/andygrunwald/go-jira"
 	"github.com/boltdb/bolt"
 	"github.com/bradfitz/slice"
 	"log"
 	"os/user"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 type searchIndex struct {
@@ -19,8 +19,6 @@ type searchIndex struct {
 func Open() searchIndex {
 	datastore := searchIndex{}
 	datastore.db = getDb()
-	//v, _ := json.MarshalIndent(datastore.db.Stats(), "", "    ")
-	//fmt.Println(string(v))
 	return datastore
 }
 
@@ -120,14 +118,28 @@ func (d *searchIndex) getSimularities(key string) ([]similaritystruct, error) {
 
 var tfidfcache map[string]map[string]float64
 
+func getStringFromIssue(issue jira.Issue) string {
+
+	comments := ""
+	if issue.Fields.Comments != nil {
+		for _, comment := range issue.Fields.Comments.Comments {
+			if len(comments) != 0 {
+				comments += " "
+			}
+			comments += comment.Body
+		}
+	}
+	return fmt.Sprintf("%s %s %s", issue.Fields.Summary, issue.Fields.Description, comments)
+}
 func (d *searchIndex) calculateTfIdf() (err error) {
 	if tfidfcache == nil {
-		t := time.Now()
 		m := make(map[string]string)
 		err := d.db.View(func(tx *bolt.Tx) error {
 			b := tx.Bucket([]byte("store"))
 			b.ForEach(func(k, v []byte) error {
-				m[string(k)] = string(v)
+				issue := jira.Issue{}
+				json.Unmarshal([]byte(v), &issue)
+				m[string(k)] = getStringFromIssue(issue)
 				return nil
 			})
 			return nil
@@ -136,7 +148,6 @@ func (d *searchIndex) calculateTfIdf() (err error) {
 			return err
 		}
 
-		fmt.Print("generating tf-idf map... ")
 		tfidfcache = tfidfMap(m)
 		bytes, _ := json.Marshal(tfidfcache)
 		err = d.db.Update(func(tx *bolt.Tx) error {
@@ -144,7 +155,6 @@ func (d *searchIndex) calculateTfIdf() (err error) {
 			b.Put([]byte("tf"), bytes)
 			return nil
 		})
-		fmt.Println(time.Now().Sub(t))
 	}
 	return nil
 }
@@ -160,8 +170,6 @@ func (d *searchIndex) calculateSimularities(key, data string) error {
 		return nil
 	})
 
-	t := time.Now()
-	fmt.Print("                                           \rgenerating similarities map... " + key + " ")
 	tfidfdata := tfidfcache[key]
 	var similarities []similaritystruct
 	for k, value := range tfidfcache {
@@ -186,7 +194,6 @@ func (d *searchIndex) calculateSimularities(key, data string) error {
 		b.Put([]byte(key), similaritiesb)
 		return nil
 	})
-	fmt.Print(time.Now().Sub(t))
 	return nil
 }
 

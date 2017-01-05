@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"encoding/xml"
-	"flag"
 	"fmt"
 	"github.com/andygrunwald/go-jira"
 	"io/ioutil"
@@ -19,7 +18,6 @@ import (
 
 var index searchIndex
 var conf config
-var clearIndex = flag.Bool("clearIndex", false, "Clear the index and reset the timestamp")
 
 func main() {
 	index = Open()
@@ -37,10 +35,12 @@ func main() {
 				Name:  "show",
 				Usage: "show detailed information of an issue",
 				Action: func(c *cli.Context) error {
+					indexFunc()
 					showDetails(c)
 					return nil
 				},
 				ShellComplete: func(c *cli.Context) {
+					indexFunc()
 					if c.NArg() > 1 {
 						return
 					}
@@ -95,43 +95,29 @@ func showDetails(c *cli.Context) {
 		os.Exit(0)
 	}
 
-	list, _, _ := jiraClient.Issue.Search("key = "+c.Args().First(), &jira.SearchOptions{StartAt: 0, MaxResults: 100})
-	for _, value := range list {
-		printIssueDet(value)
-		fmt.Println("\nSimilar issues:")
-		resSearch, err := index.getKey(value.Key)
-		if err != nil {
-			log.Panic(err)
-		}
-		index.calculateSimularities(resSearch.key, resSearch.value)
-
-		fmt.Println("\n")
-		sim, _ := index.getSimularities(value.Key)
-		keys := ""
-		if len(sim) == 0 {
-			fmt.Println("No similar issues found, please run jira -index to generate them for this issue")
-			return
-		}
-		for _, value := range sim {
-			if len(keys) != 0 {
-				keys += ","
-			}
-			keys += value.Key
-		}
-		list, _, _ := jiraClient.Issue.Search("key in ("+keys+")", &jira.SearchOptions{StartAt: 0, MaxResults: 100})
-		for _, value := range list {
-			printIssue(value)
-		}
-		fmt.Print("\n")
+	res, _ := index.getKey(c.Args().First())
+	issue := jira.Issue{}
+	json.Unmarshal([]byte(res.value), &issue)
+	printIssueDet(issue)
+	fmt.Println("\nSimilar issues:")
+	resSearch, err := index.getKey(issue.Key)
+	if err != nil {
+		log.Panic(err)
+	}
+	index.calculateSimularities(resSearch.key, resSearch.value)
+	sim, _ := index.getSimularities(issue.Key)
+	if len(sim) == 0 {
+		fmt.Println("No similar issues found, please run jira -index to generate them for this issue")
+		return
+	}
+	for _, value := range sim {
+		res, _ := index.getKey(value.Key)
+		issue := jira.Issue{}
+		json.Unmarshal([]byte(res.value), &issue)
+		printIssue(issue)
 	}
 
-	if len(list) == 0 {
-		list, _, _ := jiraClient.Issue.Search("text ~ \""+c.Args().First()+"\" ", &jira.SearchOptions{StartAt: 0, MaxResults: 100})
-		for _, value := range list {
-			printIssue(value)
-		}
-	}
-
+	fmt.Print("\n")
 }
 
 func indexFunc() {
@@ -176,16 +162,7 @@ func indexFunc() {
 			break
 		}
 		for j, l := range list {
-			comments := ""
-			if l.Fields.Comments != nil {
-				for _, comment := range l.Fields.Comments.Comments {
-					if len(comments) != 0 {
-						comments += " "
-					}
-					comments += comment.Body
-				}
-			}
-			err = index.Index(l.Key, fmt.Sprintf("%s %s %s", l.Fields.Summary, l.Fields.Description, comments))
+			err = index.Index(l.Key, l)
 			if err != nil {
 				log.Panic(err)
 			}
