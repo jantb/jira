@@ -172,6 +172,9 @@ func indexFunc() {
 			fmt.Printf("\r%d", i+j+1)
 		}
 	}
+	//fmt.Print("basic" + basicAuth(0))
+	// Get pages from confluence
+
 }
 
 func listCurrentFilter() {

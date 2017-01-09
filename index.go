@@ -131,7 +131,7 @@ func getStringFromIssue(issue jira.Issue) string {
 	}
 	return fmt.Sprintf("%s %s %s", issue.Fields.Summary, issue.Fields.Description, comments)
 }
-func (d *searchIndex) calculateTfIdf() (err error) {
+func (d *searchIndex) calculateTfIdf() error {
 	if tfidfcache == nil {
 		m := make(map[string]string)
 		err := d.db.View(func(tx *bolt.Tx) error {

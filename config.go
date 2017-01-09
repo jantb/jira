@@ -1,21 +1,28 @@
 package main
 
 import (
-	"time"
-	"io/ioutil"
-	"path/filepath"
 	"encoding/json"
+	"io/ioutil"
 	"log"
 	"os/user"
+	"path/filepath"
+	"time"
 )
 
 type config struct {
 	Username   string
 	Password   string
 	JiraServer string
-	Project string
-	Filter string
+	Project    string
+	Filter     string
 	LastUpdate time.Time
+
+	UsernameConfluence   string
+	PasswordConfluence   string
+	ConfluenceServer     string
+	ProjectConfluence    string
+	FilterConfluence     string
+	LastUpdateConfluence time.Time
 }
 
 func (c *config) load() {
