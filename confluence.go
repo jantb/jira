@@ -23,25 +23,29 @@ type Confluence struct {
 	Size  int `json:"size"`
 }
 
-func basicAuth(start int) string {
+func basicAuth() string {
 	client := &http.Client{}
-
-	urll := conf.ConfluenceServer + "rest/api/content?spaceKey=" + conf.ProjectConfluence + "&expand=body.storage&start=" + fmt.Sprintf("%d", start)
-	fmt.Println(urll)
-	req, err := http.NewRequest("GET", urll, nil)
-	req.SetBasicAuth(conf.UsernameConfluence, conf.PasswordConfluence)
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Fatal(err)
+	for i := 0; ; {
+		urll := conf.ConfluenceServer + "rest/api/content?spaceKey=" + conf.ProjectConfluence + "&expand=body.storage&start=" + fmt.Sprintf("%d", i)
+		fmt.Println(urll)
+		req, err := http.NewRequest("GET", urll, nil)
+		req.SetBasicAuth(conf.UsernameConfluence, conf.PasswordConfluence)
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Fatal(err)
+		}
+		bodyText, err := ioutil.ReadAll(resp.Body)
+		confluence := Confluence{}
+		err = json.Unmarshal(bodyText, &confluence)
+		if err != nil {
+			fmt.Println(string(bodyText))
+			log.Fatal(err)
+		}
+		i += confluence.Size
+		if confluence.Size == 0 {
+			break
+		}
 	}
-	bodyText, err := ioutil.ReadAll(resp.Body)
-	confluence := Confluence{}
-	err = json.Unmarshal(bodyText, &confluence)
-	if err != nil {
-		fmt.Println(string(bodyText))
-		log.Fatal(err)
-	}
 
-	s := string(bodyText)
-	return s
+	return ""
 }
