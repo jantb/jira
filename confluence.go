@@ -22,9 +22,14 @@ type Confluence struct {
 	Limit int `json:"limit"`
 	Size  int `json:"size"`
 }
+type page struct {
+	key  string
+	body string
+}
 
 func basicAuth() string {
 	client := &http.Client{}
+	pages := []page{}
 	for i := 0; ; {
 		urll := conf.ConfluenceServer + "rest/api/content?spaceKey=" + conf.ProjectConfluence + "&expand=body.storage&start=" + fmt.Sprintf("%d", i)
 		fmt.Println(urll)
@@ -45,7 +50,9 @@ func basicAuth() string {
 		if confluence.Size == 0 {
 			break
 		}
+		for _, result := range confluence.Results {
+			pages = append(pages, page{key: result.ID, body: result.Body.Expandable.Storage})
+		}
 	}
-
 	return ""
 }
