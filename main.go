@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
-	"github.com/andygrunwald/go-jira"
 	"io/ioutil"
 	"log"
 	"os"
@@ -13,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jantb/go-jira"
 	"gopkg.in/urfave/cli.v2"
 )
 
@@ -61,6 +61,35 @@ func main() {
 				},
 			},
 			{
+				Name:  "assign",
+				Usage: "assign to user",
+				Action: func(c *cli.Context) error {
+					indexFunc()
+					assignToUser(c)
+					return nil
+				},
+				ShellComplete: func(c *cli.Context) {
+					indexFunc()
+					if c.NArg() > 1 {
+						return
+					}
+					if c.NArg() == 1 {
+						res, _ := index.SearchAllMatchingSubString(c.Args().First())
+						for _, r := range res {
+							fmt.Println(r.key)
+						}
+					} else {
+						res, _ := index.SearchAllMatchingSubString("")
+						for _, r := range res {
+							fmt.Println(r.key)
+						}
+					}
+
+					fmt.Println("autocomplete")
+
+				},
+			},
+			{
 				Name:  "clearIndex",
 				Usage: "clear the current index",
 				Action: func(c *cli.Context) error {
@@ -76,7 +105,7 @@ func main() {
 
 }
 
-func showDetails(c *cli.Context) {
+func assignToUser(c *cli.Context) {
 	jiraClient, err := jira.NewClient(nil, conf.JiraServer)
 	if err != nil {
 		panic(err)
@@ -94,10 +123,18 @@ func showDetails(c *cli.Context) {
 		fmt.Printf("Invalid config in %s:\n%s\n", filepath.Join(usr.HomeDir, ".jira.conf"), string(bytes))
 		os.Exit(0)
 	}
+	r, err := jiraClient.Issue.Assign(c.Args().First(), conf.Username)
+	if err != nil {
+		fmt.Printf("%s\n", err)
+		b, _ := ioutil.ReadAll(r.Body)
+		fmt.Println(string(b))
+	}
+}
 
+func showDetails(c *cli.Context) {
 	res, _ := index.getKey(c.Args().First())
 	issue := jira.Issue{}
-	err = json.Unmarshal([]byte(res.value), &issue)
+	err := json.Unmarshal([]byte(res.value), &issue)
 	if err != nil {
 		return
 	}
