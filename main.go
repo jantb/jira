@@ -56,8 +56,6 @@ func main() {
 						}
 					}
 
-					fmt.Println("autocomplete")
-
 				},
 			},
 			{
@@ -78,15 +76,12 @@ func main() {
 						for _, r := range res {
 							fmt.Println(r.key)
 						}
-					} else {
+					} else if c.NArg() == 0 {
 						res, _ := index.SearchAllMatchingSubString("")
 						for _, r := range res {
 							fmt.Println(r.key)
 						}
 					}
-
-					fmt.Println("autocomplete")
-
 				},
 			},
 			{
