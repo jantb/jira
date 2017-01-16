@@ -82,34 +82,6 @@ func main() {
 						for _, r := range res {
 							fmt.Println(r.key)
 						}
-					}else if c.NArg() == 2 {
-						jiraClient, err := jira.NewClient(nil, conf.JiraServer)
-						if err != nil {
-							panic(err)
-						}
-
-						_, err = jiraClient.Authentication.AcquireSessionCookie(conf.Username, conf.Password)
-						if err != nil {
-							fmt.Printf("%s\n", err)
-							usr, err := user.Current()
-							if err != nil {
-								log.Fatal(err)
-							}
-
-							bytes, _ := json.MarshalIndent(conf, "", "    ")
-							fmt.Printf("Invalid config in %s:\n%s\n", filepath.Join(usr.HomeDir, ".jira.conf"), string(bytes))
-							os.Exit(0)
-						}
-						users, r, err := jiraClient.Issue.AssignableUsers(c.Args().First())
-						if err != nil {
-							fmt.Printf("%s\n", err)
-							b, _ := ioutil.ReadAll(r.Body)
-							log.Panic(string(b))
-						}
-						for _, user := range *users {
-							fmt.Println(user.Key)
-						}
-
 					}
 				},
 			},
@@ -147,7 +119,7 @@ func assignToUser(c *cli.Context) {
 		fmt.Printf("Invalid config in %s:\n%s\n", filepath.Join(usr.HomeDir, ".jira.conf"), string(bytes))
 		os.Exit(0)
 	}
-	r, err := jiraClient.Issue.Assign(c.Args().First(), c.Args().Get(1))
+	r, err := jiraClient.Issue.Assign(c.Args().First(), conf.Username)
 	if err != nil {
 		fmt.Printf("%s\n", err)
 		b, _ := ioutil.ReadAll(r.Body)
