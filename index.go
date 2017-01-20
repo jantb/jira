@@ -43,6 +43,22 @@ func (d *searchIndex) Index(key string, data interface{}) error {
 	return err
 }
 
+func (d *searchIndex) IndexConfluence(key string, data interface{}) error {
+	datab, err := json.Marshal(data)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	err = d.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("confluence"))
+		b.Put([]byte(key), datab)
+		return nil
+	})
+
+	return err
+}
+
 type Res struct {
 	key   string
 	value string
@@ -51,6 +67,7 @@ type Res struct {
 func (d *searchIndex) Clear() {
 	d.db.Update(func(tx *bolt.Tx) error {
 		tx.DeleteBucket([]byte("store"))
+		tx.DeleteBucket([]byte("confluence"))
 		tx.DeleteBucket([]byte("similarDocuments"))
 		tx.DeleteBucket([]byte("tfcache"))
 		return nil
@@ -93,6 +110,18 @@ func (d *searchIndex) getKey(key string) (Res, error) {
 	var res Res
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("store"))
+		get := b.Get([]byte(key))
+		res.key = key
+		res.value = string(get)
+		return nil
+	})
+	return res, err
+}
+
+func (d *searchIndex) getConfluenceKey(key string) (Res, error) {
+	var res Res
+	err := d.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("confluence"))
 		get := b.Get([]byte(key))
 		res.key = key
 		res.value = string(get)
@@ -144,6 +173,18 @@ func (d *searchIndex) calculateTfIdf() error {
 			})
 			return nil
 		})
+
+		err = d.db.View(func(tx *bolt.Tx) error {
+			b := tx.Bucket([]byte("confluence"))
+			b.ForEach(func(k, v []byte) error {
+				page := Page{}
+				json.Unmarshal([]byte(v), &page)
+				m[string(k)] = page.Body
+				return nil
+			})
+			return nil
+		})
+
 		if err != nil {
 			return err
 		}
@@ -185,7 +226,7 @@ func (d *searchIndex) calculateSimularities(key, data string) error {
 		return similarities[i].Similarity > similarities[j].Similarity
 	})
 
-	similaritiesb, err := json.Marshal(similarities[:20])
+	similaritiesb, err := json.Marshal(similarities[:200])
 	if err != nil {
 		return err
 	}
@@ -210,6 +251,7 @@ func getDb() *bolt.DB {
 
 	err = dbs.Update(func(tx *bolt.Tx) error {
 		tx.CreateBucketIfNotExists([]byte("store"))
+		tx.CreateBucketIfNotExists([]byte("confluence"))
 		tx.CreateBucketIfNotExists([]byte("similarDocuments"))
 		tx.CreateBucketIfNotExists([]byte("tfcache"))
 		return nil

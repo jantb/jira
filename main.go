@@ -22,6 +22,7 @@ var conf config
 func main() {
 	index = Open()
 	conf.load()
+	getConfluencePages()
 	app := &cli.App{
 		EnableShellCompletion: true,
 		Action: func(c *cli.Context) error {
@@ -146,17 +147,46 @@ func showDetails(c *cli.Context) {
 		fmt.Println("No similar issues found, please run jira -index to generate them for this issue")
 		return
 	}
+	var issues = []jira.Issue{}
+	var confluence = []string{}
 	for _, value := range sim {
 		res, _ := index.getKey(value.Key)
+
 		issue := jira.Issue{}
-		json.Unmarshal([]byte(res.value), &issue)
+		err := json.Unmarshal([]byte(res.value), &issue)
+		if err != nil {
+			res, _ = index.getConfluenceKey(value.Key)
+			page := Page{}
+			json.Unmarshal([]byte(res.value), &page)
+			confluence = append(confluence, fmt.Sprintf("%s \033[34m%-10s\033[m", page.Title, page.Link))
+		} else {
+			issues = append(issues, issue)
+		}
+
+	}
+	if len(issues) > 20 {
+		issues = issues[:20]
+	}
+	if len(confluence) > 20 {
+		confluence = confluence[:20]
+	}
+	for _, issue := range issues {
 		printIssue(issue)
+	}
+	for _, c := range confluence {
+		fmt.Println(c)
 	}
 
 	fmt.Print("\n")
 }
 
 func indexFunc() {
+	//fmt.Print("basic" + basicAuth(0))
+	// Get pages from confluence
+	for _, page := range getConfluencePages() {
+		index.IndexConfluence(page.Key, page)
+	}
+
 	jiraClient, err := jira.NewClient(nil, conf.JiraServer)
 	if err != nil {
 		panic(err)
@@ -205,8 +235,6 @@ func indexFunc() {
 			fmt.Printf("\r%d", i+j+1)
 		}
 	}
-	//fmt.Print("basic" + basicAuth(0))
-	// Get pages from confluence
 
 }
 
