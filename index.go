@@ -64,6 +64,30 @@ func (d *SearchIndex) IndexConfluence(key string, data interface{}) error {
 	return err
 }
 
+// IndexSearch add search to index
+func (d *SearchIndex) IndexSearch(data interface{}) ([]similaritystruct, error) {
+	datab, err := json.Marshal(data)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	err = d.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("search"))
+		b.Put([]byte("search"), datab)
+		return nil
+	})
+	d.calculateTfIdf()
+	d.calculateSimularities("search")
+	similarities, _ := d.getSimularities("search")
+	err = d.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("search"))
+		b.Delete([]byte("search"))
+		return nil
+	})
+	return similarities, err
+}
+
 // Res from the index
 type Res struct {
 	key   string
@@ -75,6 +99,7 @@ func (d *SearchIndex) Clear() {
 	d.db.Update(func(tx *bolt.Tx) error {
 		tx.DeleteBucket([]byte("store"))
 		tx.DeleteBucket([]byte("confluence"))
+		tx.DeleteBucket([]byte("search"))
 		tx.DeleteBucket([]byte("similarDocuments"))
 		tx.DeleteBucket([]byte("tfcache"))
 		return nil
@@ -194,6 +219,17 @@ func (d *SearchIndex) calculateTfIdf() error {
 			return nil
 		})
 
+		err = d.db.View(func(tx *bolt.Tx) error {
+			b := tx.Bucket([]byte("search"))
+			b.ForEach(func(k, v []byte) error {
+				page := Page{}
+				json.Unmarshal([]byte(v), &page)
+				m[string(k)] = string(v)
+				return nil
+			})
+			return nil
+		})
+
 		if err != nil {
 			return err
 		}
@@ -209,7 +245,7 @@ func (d *SearchIndex) calculateTfIdf() error {
 	return nil
 }
 
-func (d *SearchIndex) calculateSimularities(key, data string) error {
+func (d *SearchIndex) calculateSimularities(key string) error {
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("tfcache"))
 		bytes := b.Get([]byte("tf"))
@@ -261,6 +297,7 @@ func getDb() *bolt.DB {
 	err = dbs.Update(func(tx *bolt.Tx) error {
 		tx.CreateBucketIfNotExists([]byte("store"))
 		tx.CreateBucketIfNotExists([]byte("confluence"))
+		tx.CreateBucketIfNotExists([]byte("search"))
 		tx.CreateBucketIfNotExists([]byte("similarDocuments"))
 		tx.CreateBucketIfNotExists([]byte("tfcache"))
 		return nil

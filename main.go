@@ -32,6 +32,46 @@ func main() {
 		},
 		Commands: []*cli.Command{
 			{
+				Name:  "search",
+				Usage: "search issues and confluencepages for string",
+				Action: func(c *cli.Context) error {
+					indexFunc()
+
+					var issues = []jira.Issue{}
+					var confluence = []string{}
+					sim, _ := index.IndexSearch(strings.Join(c.Args().Slice(), " "))
+					for _, value := range sim {
+						res, _ := index.getKey(value.Key)
+
+						issue := jira.Issue{}
+						err := json.Unmarshal([]byte(res.value), &issue)
+						if err != nil {
+							res, _ = index.getConfluenceKey(value.Key)
+							page := Page{}
+							json.Unmarshal([]byte(res.value), &page)
+							confluence = append(confluence, fmt.Sprintf("%s \033[34m%-10s\033[m", page.Title, page.Link))
+						} else {
+							issues = append(issues, issue)
+						}
+
+					}
+					if len(issues) > 20 {
+						issues = issues[:20]
+					}
+					if len(confluence) > 20 {
+						confluence = confluence[:20]
+					}
+					for _, issue := range issues {
+						printIssue(issue)
+					}
+					fmt.Println("\nRelated confluence pages:")
+					for _, c := range confluence {
+						fmt.Println(c)
+					}
+					return nil
+				},
+			},
+			{
 				Name:  "show",
 				Usage: "show detailed information of an issue",
 				Action: func(c *cli.Context) error {
@@ -140,7 +180,7 @@ func showDetails(c *cli.Context) {
 	if err != nil {
 		log.Panic(err)
 	}
-	index.calculateSimularities(resSearch.key, resSearch.value)
+	index.calculateSimularities(resSearch.key)
 	sim, _ := index.getSimularities(issue.Key)
 	if len(sim) == 0 {
 		fmt.Println("No similar issues found, please run jira -index to generate them for this issue")
@@ -172,6 +212,7 @@ func showDetails(c *cli.Context) {
 	for _, issue := range issues {
 		printIssue(issue)
 	}
+	fmt.Println("\nRelated confluence pages:")
 	for _, c := range confluence {
 		fmt.Println(c)
 	}
