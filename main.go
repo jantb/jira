@@ -22,7 +22,7 @@ var conf config
 func main() {
 	index = Open()
 	conf.load()
-	getConfluencePages()
+	//getConfluencePages()
 	app := &cli.App{
 		EnableShellCompletion: true,
 		Action: func(c *cli.Context) error {

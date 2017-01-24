@@ -41,6 +41,7 @@ func getIntersection(a, b map[string]float64) (keys []string) {
 	}
 	return keys
 }
+
 func dot(a, b map[string]float64, intersection []string) (dotProduct float64) {
 	for _, av := range intersection {
 		dotProduct += a[av] * b[av]

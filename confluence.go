@@ -4,11 +4,15 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
-	"github.com/jantb/jira/strip"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"strings"
+	"time"
+
+	"net/url"
+
+	"github.com/jantb/jira/strip"
 )
 
 type Confluence struct {
@@ -44,7 +48,7 @@ func getConfluencePages() []Page {
 	client := &http.Client{}
 	pages := []Page{}
 	for i := 0; ; {
-		urll := conf.ConfluenceServer + "rest/api/content?spaceKey=" + conf.ProjectConfluence + "&expand=body.storage.content&start=" + fmt.Sprintf("%d", i)
+		urll := conf.ConfluenceServer + "rest/api/content/search?cql=" + url.QueryEscape("space="+conf.ProjectConfluence+" and lastModified > \""+conf.LastUpdateConfluence.Format("2006/01/02")+"\"") + "&expand=body.storage.content&start=" + fmt.Sprintf("%d", i)
 		req, err := http.NewRequest("GET", urll, nil)
 		req.SetBasicAuth(conf.UsernameConfluence, conf.PasswordConfluence)
 		resp, err := client.Do(req)
@@ -59,7 +63,10 @@ func getConfluencePages() []Page {
 			log.Fatal(err)
 		}
 		i += confluence.Size
+
 		if confluence.Size == 0 {
+			conf.LastUpdateConfluence = time.Now()
+			conf.store()
 			break
 		}
 		for _, result := range confluence.Results {
