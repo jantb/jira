@@ -19,6 +19,7 @@ func similarityVector(a, b []float64, dot float64) float64 {
 	return dot / (math.Sqrt(normA) * math.Sqrt(normB))
 }
 
+// Keys exstracts keys from map
 func Keys(m map[string]float64) (keys []string) {
 	for k := range m {
 		keys = append(keys, k)
@@ -26,6 +27,7 @@ func Keys(m map[string]float64) (keys []string) {
 	return keys
 }
 
+// Vals exstracts vals from map
 func Vals(m map[string]float64) (vals []float64) {
 	for _, v := range m {
 		vals = append(vals, v)

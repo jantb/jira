@@ -15,6 +15,7 @@ import (
 	"github.com/jantb/jira/strip"
 )
 
+// Confluence struct for holding pages from confluence
 type Confluence struct {
 	Results []struct {
 		ID     string `json:"id"`
@@ -37,6 +38,8 @@ type Confluence struct {
 	Limit int `json:"limit"`
 	Size  int `json:"size"`
 }
+
+// Page struct to hold info
 type Page struct {
 	Key   string
 	Body  string
@@ -48,7 +51,7 @@ func getConfluencePages() []Page {
 	client := &http.Client{}
 	pages := []Page{}
 	for i := 0; ; {
-		urll := conf.ConfluenceServer + "rest/api/content/search?cql=" + url.QueryEscape("space="+conf.ProjectConfluence+" and lastModified > \""+conf.LastUpdateConfluence.Format("2006/01/02")+"\"") + "&expand=body.storage.content&start=" + fmt.Sprintf("%d", i)
+		urll := conf.ConfluenceServer + "rest/api/content/search?cql=" + url.QueryEscape("space in ("+conf.ProjectConfluence+") and lastModified > \""+conf.LastUpdateConfluence.Format("2006/01/02")+"\"") + "&expand=body.storage.content&start=" + fmt.Sprintf("%d", i)
 		req, err := http.NewRequest("GET", urll, nil)
 		req.SetBasicAuth(conf.UsernameConfluence, conf.PasswordConfluence)
 		resp, err := client.Do(req)

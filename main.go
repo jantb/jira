@@ -16,13 +16,12 @@ import (
 	"gopkg.in/urfave/cli.v2"
 )
 
-var index searchIndex
+var index SearchIndex
 var conf config
 
 func main() {
 	index = Open()
 	conf.load()
-	//getConfluencePages()
 	app := &cli.App{
 		EnableShellCompletion: true,
 		Action: func(c *cli.Context) error {
@@ -181,8 +180,6 @@ func showDetails(c *cli.Context) {
 }
 
 func indexFunc() {
-	//fmt.Print("basic" + basicAuth(0))
-	// Get pages from confluence
 	for _, page := range getConfluencePages() {
 		index.IndexConfluence(page.Key, page)
 	}

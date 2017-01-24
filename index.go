@@ -3,21 +3,24 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/andygrunwald/go-jira"
-	"github.com/boltdb/bolt"
-	"github.com/bradfitz/slice"
 	"log"
 	"os/user"
 	"path/filepath"
 	"strings"
+
+	"github.com/andygrunwald/go-jira"
+	"github.com/boltdb/bolt"
+	"github.com/bradfitz/slice"
 )
 
-type searchIndex struct {
+//SearchIndex state
+type SearchIndex struct {
 	db *bolt.DB
 }
 
-func Open() searchIndex {
-	datastore := searchIndex{}
+// Open a search index
+func Open() SearchIndex {
+	datastore := SearchIndex{}
 	datastore.db = getDb()
 	return datastore
 }
@@ -27,7 +30,8 @@ type similaritystruct struct {
 	Similarity float64
 }
 
-func (d *searchIndex) Index(key string, data interface{}) error {
+// Index add issue to index
+func (d *SearchIndex) Index(key string, data interface{}) error {
 	datab, err := json.Marshal(data)
 	if err != nil {
 		fmt.Println(err)
@@ -43,7 +47,8 @@ func (d *searchIndex) Index(key string, data interface{}) error {
 	return err
 }
 
-func (d *searchIndex) IndexConfluence(key string, data interface{}) error {
+// IndexConfluence add confluence page to index
+func (d *SearchIndex) IndexConfluence(key string, data interface{}) error {
 	datab, err := json.Marshal(data)
 	if err != nil {
 		fmt.Println(err)
@@ -59,12 +64,14 @@ func (d *searchIndex) IndexConfluence(key string, data interface{}) error {
 	return err
 }
 
+// Res from the index
 type Res struct {
 	key   string
 	value string
 }
 
-func (d *searchIndex) Clear() {
+// Clear the index
+func (d *SearchIndex) Clear() {
 	d.db.Update(func(tx *bolt.Tx) error {
 		tx.DeleteBucket([]byte("store"))
 		tx.DeleteBucket([]byte("confluence"))
@@ -75,7 +82,8 @@ func (d *searchIndex) Clear() {
 	return
 }
 
-func (d *searchIndex) SearchAllMatching(count int) ([]Res, error) {
+// SearchAllMatching search in the index
+func (d *SearchIndex) SearchAllMatching(count int) ([]Res, error) {
 	var res []Res
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("store"))
@@ -90,7 +98,8 @@ func (d *searchIndex) SearchAllMatching(count int) ([]Res, error) {
 	return res, err
 }
 
-func (d *searchIndex) SearchAllMatchingSubString(s string) ([]Res, error) {
+// SearchAllMatchingSubString searh for substring in the index
+func (d *SearchIndex) SearchAllMatchingSubString(s string) ([]Res, error) {
 	var res []Res
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("store"))
@@ -106,7 +115,7 @@ func (d *searchIndex) SearchAllMatchingSubString(s string) ([]Res, error) {
 	return res, err
 }
 
-func (d *searchIndex) getKey(key string) (Res, error) {
+func (d *SearchIndex) getKey(key string) (Res, error) {
 	var res Res
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("store"))
@@ -118,7 +127,7 @@ func (d *searchIndex) getKey(key string) (Res, error) {
 	return res, err
 }
 
-func (d *searchIndex) getConfluenceKey(key string) (Res, error) {
+func (d *SearchIndex) getConfluenceKey(key string) (Res, error) {
 	var res Res
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("confluence"))
@@ -130,7 +139,7 @@ func (d *searchIndex) getConfluenceKey(key string) (Res, error) {
 	return res, err
 }
 
-func (d *searchIndex) getSimularities(key string) ([]similaritystruct, error) {
+func (d *SearchIndex) getSimularities(key string) ([]similaritystruct, error) {
 	similarities := make([]similaritystruct, 0)
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("similarDocuments"))
@@ -160,7 +169,7 @@ func getStringFromIssue(issue jira.Issue) string {
 	}
 	return fmt.Sprintf("%s %s %s", issue.Fields.Summary, issue.Fields.Description, comments)
 }
-func (d *searchIndex) calculateTfIdf() error {
+func (d *SearchIndex) calculateTfIdf() error {
 	if tfidfcache == nil {
 		m := make(map[string]string)
 		err := d.db.View(func(tx *bolt.Tx) error {
@@ -200,7 +209,7 @@ func (d *searchIndex) calculateTfIdf() error {
 	return nil
 }
 
-func (d *searchIndex) calculateSimularities(key, data string) error {
+func (d *SearchIndex) calculateSimularities(key, data string) error {
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("tfcache"))
 		bytes := b.Get([]byte("tf"))
