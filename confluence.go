@@ -72,6 +72,7 @@ func getConfluencePages() []Page {
 			conf.store()
 			break
 		}
+		fmt.Printf("\r%d changed/new confluence pages", i)
 		for _, result := range confluence.Results {
 			text := strip.StripTags(result.Body.Storage.Value)
 			for key, value := range xml.HTMLEntity {
@@ -80,5 +81,9 @@ func getConfluencePages() []Page {
 			pages = append(pages, Page{Key: result.ID, Body: text, Title: result.Title, Link: conf.ConfluenceServer + result.Links.Webui[1:]})
 		}
 	}
+	if len(pages) > 0 {
+		fmt.Println()
+	}
+
 	return pages
 }

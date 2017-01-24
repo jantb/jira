@@ -130,6 +130,7 @@ func main() {
 				Usage: "clear the current index",
 				Action: func(c *cli.Context) error {
 					conf.LastUpdate = time.Time{}
+					conf.LastUpdateConfluence = time.Time{}
 					conf.store()
 					index.Clear()
 					return nil
@@ -246,7 +247,7 @@ func indexFunc() {
 	now := time.Now()
 	for i := 0; ; i += 100 {
 		searchString := "project in (" + conf.Project + ") AND updated > '" + conf.LastUpdate.Format("2006/01/02 15:04"+"'")
-		list, response, err := jiraClient.Issue.Search(searchString, &jira.SearchOptions{StartAt: i, MaxResults: 100})
+		list, response, err := jiraClient.Issue.Search(searchString, &jira.SearchOptions{StartAt: i})
 		if err != nil {
 			i -= 100
 			b, _ := ioutil.ReadAll(response.Body)
