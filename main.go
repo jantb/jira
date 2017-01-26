@@ -245,9 +245,10 @@ func indexFunc() {
 	}
 
 	now := time.Now()
+
 	for i := 0; ; i += 100 {
 		searchString := "project in (" + conf.Project + ") AND updated > '" + conf.LastUpdate.Format("2006/01/02 15:04"+"'")
-		list, response, err := jiraClient.Issue.Search(searchString, &jira.SearchOptions{StartAt: i})
+		list, response, err := jiraClient.Issue.Search(searchString, &jira.SearchOptions{StartAt: i, MaxResults: 25})
 		if err != nil {
 			i -= 100
 			b, _ := ioutil.ReadAll(response.Body)
@@ -262,7 +263,6 @@ func indexFunc() {
 		if len(list) == 0 && i > 0 {
 			conf.LastUpdate = now
 			conf.store()
-			fmt.Println(" new/changed issues")
 			index.calculateTfIdf()
 			break
 		}
@@ -271,9 +271,10 @@ func indexFunc() {
 			if err != nil {
 				log.Panic(err)
 			}
-			fmt.Printf("\r%d", i+j+1)
+			fmt.Printf("                                               \r%d new/changed issues", i+j+1)
 		}
 	}
+	fmt.Println()
 
 }
 

@@ -72,8 +72,8 @@ func getConfluencePages() []Page {
 			conf.store()
 			break
 		}
-		fmt.Printf("\r%d changed/new confluence pages", i)
-		for _, result := range confluence.Results {
+		for j, result := range confluence.Results {
+			fmt.Printf("\r%d changed/new confluence pages", i+j)
 			text := strip.StripTags(result.Body.Storage.Value)
 			for key, value := range xml.HTMLEntity {
 				text = strings.Replace(text, "&"+key+";", value, -1)
