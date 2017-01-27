@@ -373,9 +373,6 @@ func printIssue(issue jira.Issue) {
 	if assignee == conf.Username {
 		assignee = fmt.Sprintf("\033[1;31m%-10s\033[m", conf.Username)
 	}
-	if creator == conf.Username {
-		assignee = fmt.Sprintf("\033[1;31m-10%s\033[m", conf.Username)
-	}
 	fmt.Printf("%-15s %-15s %-10s %-10s %-10s %-20s %-20s %s\n",
 		key, updated[:len("2006-01-02T15:04:05")], priority, assignee, creator, fix, status, summary)
 }
