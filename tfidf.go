@@ -21,7 +21,7 @@ func removeNorwegianStopwords(words []string) []string {
 	var vår ved verdi vi vil ville vite være vært`)
 	var ret []string
 	for _, word := range words {
-		if len(word) < 4 {
+		if len(word) < 3 {
 			continue
 		}
 
