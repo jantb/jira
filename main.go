@@ -16,6 +16,7 @@ import (
 	"gopkg.in/urfave/cli.v2"
 	"strconv"
 	"unicode/utf8"
+	"regexp"
 )
 
 var index SearchIndex
@@ -154,12 +155,12 @@ func formatIssues(issues []jira.Issue) []string {
 	length := make([]int, len(print[0]))
 	for _, i := range print {
 		for index, i2 := range i {
-			length[index] = Max(utf8.RuneCount([]byte(i2)), length[index])
+			length[index] = Max(utf8.RuneCount([]byte(removeColor(i2))), length[index])
 		}
 	}
 	for _, i := range print {
 		for key, leng := range length {
-			i[key] = i[key] +fmt.Sprintf("%-" + strconv.Itoa(leng - utf8.RuneCount([]byte(i[key]))) + "s", " ")
+			i[key] = i[key] +fmt.Sprintf("%-" + strconv.Itoa(leng+1 - utf8.RuneCount([]byte(removeColor(i[key])))) + "s", " ")
 		}
 	}
 
@@ -246,8 +247,9 @@ func showDetails(c *cli.Context) {
 	if len(confluence) > 20 {
 		confluence = confluence[:20]
 	}
-	for _, issue := range issues {
-		printIssue(issue)
+
+	for _, issue := range formatIssues(issues) {
+		fmt.Println(issue)
 	}
 	fmt.Println("\nRelated confluence pages:")
 	for _, c := range confluence {
@@ -420,11 +422,13 @@ func printIssue(issue jira.Issue) (ret []string) {
 	ret = append(ret, fix)
 	ret = append(ret, status)
 	ret = append(ret, summary)
-	//fmt.Printf("%-15s %-15s %-10s %-10s %-10s %-20s %-20s %s\n",
-	//	key, updated[:len("2006-01-02T15:04:05")], priority, assignee, creator, fix, status, summary)
 	return ret
 }
-
+func removeColor(x string) string{
+	re := regexp.MustCompile("\\033\\[[0-9;]*m")
+	x = re.ReplaceAllString(x, "")
+	return x
+}
 func getNextFixVersion() string {
 	type Result struct {
 		Value string `xml:"version"`
