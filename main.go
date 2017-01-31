@@ -14,6 +14,8 @@ import (
 
 	"github.com/jantb/go-jira"
 	"gopkg.in/urfave/cli.v2"
+	"strconv"
+	"unicode/utf8"
 )
 
 var index SearchIndex
@@ -61,9 +63,11 @@ func main() {
 					if len(confluence) > 20 {
 						confluence = confluence[:20]
 					}
-					for _, issue := range issues {
-						printIssue(issue)
+
+					for _, value := range formatIssues(issues) {
+						fmt.Println(value)
 					}
+
 					fmt.Println("\nRelated confluence pages:")
 					for _, c := range confluence {
 						fmt.Println(c)
@@ -140,6 +144,38 @@ func main() {
 	}
 	app.Run(os.Args)
 
+}
+
+func formatIssues(issues []jira.Issue) []string {
+	print := [][]string{}
+	for _, issue := range issues {
+		print = append(print, printIssue(issue))
+	}
+	length := make([]int, len(print[0]))
+	for _, i := range print {
+		for index, i2 := range i {
+			length[index] = Max(utf8.RuneCount([]byte(i2)), length[index])
+		}
+	}
+	for _, i := range print {
+		for key, leng := range length {
+			i[key] = i[key] +fmt.Sprintf("%-" + strconv.Itoa(leng - utf8.RuneCount([]byte(i[key]))) + "s", " ")
+		}
+	}
+
+	ret := []string{}
+	for _, value := range print {
+		ret = append(ret, strings.Join(value, ""))
+	}
+	return ret
+}
+
+
+func Max(x, y int) int {
+	if x > y {
+		return x
+	}
+	return y
 }
 
 func assignToUser(c *cli.Context) {
@@ -222,10 +258,11 @@ func showDetails(c *cli.Context) {
 }
 
 func indexFunc() {
-	for _, page := range getConfluencePages() {
-		index.IndexConfluence(page.Key, page)
+	if conf.ConfluenceServer != "" {
+		for _, page := range getConfluencePages() {
+			index.IndexConfluence(page.Key, page)
+		}
 	}
-
 	jiraClient, err := jira.NewClient(nil, conf.JiraServer)
 	if err != nil {
 		panic(err)
@@ -246,11 +283,11 @@ func indexFunc() {
 
 	now := time.Now()
 
-	for i := 0; ; i += 100 {
-		searchString := "project in (" + conf.Project + ") AND updated > '" + conf.LastUpdate.Format("2006/01/02 15:04"+"'")
+	for i := 0; ; i += 25 {
+		searchString := "project in (" + conf.Project + ") AND updated > '" + conf.LastUpdate.Format("2006/01/02 15:04" + "'")
 		list, response, err := jiraClient.Issue.Search(searchString, &jira.SearchOptions{StartAt: i, MaxResults: 25})
 		if err != nil {
-			i -= 100
+			i -= 25
 			b, _ := ioutil.ReadAll(response.Body)
 			fmt.Printf("Rolling back 100 commits to get around the error %s %s\n", err, b)
 			continue
@@ -271,7 +308,7 @@ func indexFunc() {
 			if err != nil {
 				log.Panic(err)
 			}
-			fmt.Printf("                                               \r%d new/changed issues", i+j+1)
+			fmt.Printf("                                               \r%d new/changed issues", i + j + 1)
 		}
 	}
 	fmt.Println()
@@ -300,9 +337,10 @@ func listCurrentFilter() {
 	searchString := "filter=" + conf.Filter
 	list, _, _ := jiraClient.Issue.Search(searchString, &jira.SearchOptions{StartAt: 0, MaxResults: 100})
 	fmt.Println("Next fix version " + getNextFixVersion())
-	for _, issue := range list {
-		printIssue(issue)
+	for _, value := range formatIssues(list) {
+		fmt.Println(value)
 	}
+
 }
 func printIssueDet(issue jira.Issue) {
 	var fix = ""
@@ -317,10 +355,10 @@ func printIssueDet(issue jira.Issue) {
 	fmt.Printf("\033[31m%-10s\033[m ", issue.Fields.Type.Name)
 	fmt.Printf("\033[33m%-10s\033[m ", issue.Fields.Status.Name)
 	if issue.Fields.Creator != nil {
-		fmt.Printf("\033[34m%-10s\033[m ", issue.Fields.Creator.Name)
+		fmt.Printf("\033[34m%-10s\033[m ", issue.Fields.Creator.DisplayName)
 	}
 	if issue.Fields.Assignee != nil {
-		fmt.Printf("\033[35m%-10s\033[m ", issue.Fields.Assignee.Name)
+		fmt.Printf("\033[35m%-10s\033[m ", issue.Fields.Assignee.DisplayName)
 	}
 	fmt.Printf("\033[36m%-10s\033[m ", fix)
 	fmt.Printf("\n%s\n", issue.Fields.Summary)
@@ -334,19 +372,20 @@ func printIssueDet(issue jira.Issue) {
 		}
 	}
 
-	fmt.Printf("\033[34m%-10s\033[m\n", conf.JiraServer+"browse/"+issue.Key)
+	fmt.Printf("\033[34m%-10s\033[m\n", conf.JiraServer + "browse/" + issue.Key)
 }
 
-func printIssue(issue jira.Issue) {
+func printIssue(issue jira.Issue) (ret []string) {
+
 	var priorityValue = issue.Fields.Priority.Name
 	var priorityID = issue.Fields.Priority.ID
 	var creator = ""
 	if issue.Fields.Creator != nil {
-		creator = issue.Fields.Creator.Name
+		creator = issue.Fields.Creator.DisplayName
 	}
 	var assignee = ""
 	if issue.Fields.Assignee != nil {
-		assignee = issue.Fields.Assignee.Name
+		assignee = issue.Fields.Assignee.DisplayName
 	}
 	var key = issue.Key
 	var updated = issue.Fields.Updated
@@ -362,19 +401,28 @@ func printIssue(issue jira.Issue) {
 	}
 	var priority = ""
 	if priorityID == "3" {
-		priority = fmt.Sprintf("\033[0;32m%-10s\033[m", priorityValue)
+		priority = fmt.Sprintf("\033[0;32m%s\033[m", priorityValue)
 	} else if priorityID == "2" {
-		priority = fmt.Sprintf("\033[0;31m%-10s\033[m", priorityValue)
+		priority = fmt.Sprintf("\033[0;31m%s\033[m", priorityValue)
 	} else if priorityID == "1" {
-		priority = fmt.Sprintf("\033[0;30;41m%-10s\033[m", priorityValue)
+		priority = fmt.Sprintf("\033[0;30;41m%s\033[m", priorityValue)
 	} else {
 		priority = fmt.Sprintf("%s", priorityValue)
 	}
-	if assignee == conf.Username {
-		assignee = fmt.Sprintf("\033[1;31m%-10s\033[m", conf.Username)
+	if issue.Fields.Assignee !=nil && issue.Fields.Assignee.Name == conf.Username {
+		assignee = fmt.Sprintf("\033[1;31m%-10s\033[m", assignee)
 	}
-	fmt.Printf("%-15s %-15s %-10s %-10s %-10s %-20s %-20s %s\n",
-		key, updated[:len("2006-01-02T15:04:05")], priority, assignee, creator, fix, status, summary)
+	ret = append(ret, key)
+	ret = append(ret, updated[:len("2006-01-02T15:04:05")])
+	ret = append(ret, priority)
+	ret = append(ret, assignee)
+	ret = append(ret, creator)
+	ret = append(ret, fix)
+	ret = append(ret, status)
+	ret = append(ret, summary)
+	//fmt.Printf("%-15s %-15s %-10s %-10s %-10s %-20s %-20s %s\n",
+	//	key, updated[:len("2006-01-02T15:04:05")], priority, assignee, creator, fix, status, summary)
+	return ret
 }
 
 func getNextFixVersion() string {
