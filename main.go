@@ -36,7 +36,7 @@ func main() {
 		Commands: []*cli.Command{
 			{
 				Name:  "search",
-				Usage: "search issues and confluencepages for string",
+				Usage: "search issues and Confluence pages for string",
 				Action: func(c *cli.Context) error {
 					indexFunc()
 
@@ -174,6 +174,13 @@ func formatIssues(issues []jira.Issue) []string {
 
 func Max(x, y int) int {
 	if x > y {
+		return x
+	}
+	return y
+}
+
+func Min(x, y int) int {
+	if x < y {
 		return x
 	}
 	return y

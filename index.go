@@ -271,7 +271,7 @@ func (d *SearchIndex) calculateSimularities(key string) error {
 		return similarities[i].Similarity > similarities[j].Similarity
 	})
 
-	similaritiesb, err := json.Marshal(similarities[:200])
+	similaritiesb, err := json.Marshal(similarities[:Min(200, len(similarities))])
 	if err != nil {
 		return err
 	}
