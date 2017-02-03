@@ -78,6 +78,7 @@ func getConfluencePages() []Page {
 			for key, value := range xml.HTMLEntity {
 				text = strings.Replace(text, "&"+key+";", value, -1)
 			}
+			text = strings.ToLower(text)
 			pages = append(pages, Page{Key: result.ID, Body: text, Title: result.Title, Link: conf.ConfluenceServer + result.Links.Webui[1:]})
 		}
 	}
