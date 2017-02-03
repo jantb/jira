@@ -42,7 +42,7 @@ func main() {
 
 					var issues = []jira.Issue{}
 					var confluence = []string{}
-					sim, _ := index.IndexSearch(strings.Join(c.Args().Slice(), " "))
+					sim, _ := index.IndexSearch(strings.ToLower(strings.Join(c.Args().Slice(), " ")))
 					for _, value := range sim {
 						res, _ := index.getKey(value.Key)
 
